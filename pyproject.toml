@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "cowboy"
+version = "0.1.0"
+description = ""
+authors = ["John Peng"]
+readme = "README.md"
+
+packages = [
+    { include = "cowboy", from = "src" }
+]
+
+[tool.poetry.scripts]
+cowboy = "cowboy.cli:main"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+mypy = "^1.14.1"
+sqlmodel = "^0.0.22"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
