@@ -16,6 +16,13 @@ cowboy = "cowboy.cli:main"
 python = "^3.12"
 mypy = "^1.14.1"
 sqlmodel = "^0.0.22"
+tiktoken = "^0.8.0"
+instructor = "^1.7.2"
+litellm = "^1.59.3"
+pydantic = "^2.10.5"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.4"
 
 [build-system]
 requires = ["poetry-core"]

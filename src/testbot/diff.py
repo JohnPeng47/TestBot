@@ -1,15 +1,19 @@
-from src.lib.utils import find_substring
-
 from typing import List, Tuple, Optional, NewType, NamedTuple
 from pathlib import Path
 import re
 from enum import Enum
 
-SHA = NewType("SHA", str)
+def find_substring(string: str, substring: str):
+    indices = []
+    start = 0
+    while start < len(string):
+        start = string.find(substring, start)
+        if start == -1:  # No more occurrences
+            return indices
+        indices.append(start)
+        start += 1  # Move past the last found index to find subsequent matches
 
-
-class NoTestCtxtException(Exception):
-    pass
+    return indices
 
 
 class HunkChunk:
