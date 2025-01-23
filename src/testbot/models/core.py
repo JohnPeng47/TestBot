@@ -19,9 +19,7 @@ class RepoConfig(SQLModel, table=True):
     repo_name: str
     url: str
     source_folder: str
-    cloned_folders: Optional[List[str]] = Field(default=[], sa_type=JSON)
-
-    # python_conf: dict = Field(sa_type=JSON)
+    # cloned_folders: Optional[List[str]] = Field(default=[], sa_type=JSON)
 
     def __init__(self, **data):
         super().__init__(**data)
@@ -31,10 +29,9 @@ class RepoConfig(SQLModel, table=True):
     def validate_url(cls, v):
         import re
 
-        if not re.match(r"^https:\/\/github\.com\/[\w-]+\/[\w-]+(\.git)?$", v):
+        if not (re.match(r"^https:\/\/github\.com\/[\w-]+\/[\w-]+(\.git)?$", v) or 
+                re.match(r"^git@github\.com:[\w-]+\/[\w-]+\.git$", v)):
             raise ValueError(
-                "URL must be a valid GitHub HTTPS URL and may end with .git"
+                f"{v} must be a valid GitHub HTTPS URL or SSH URL"
             )
-        if re.match(r"^git@github\.com:[\w-]+\/[\w-]+\.git$", v):
-            raise ValueError("SSH URL format is not allowed")
         return v

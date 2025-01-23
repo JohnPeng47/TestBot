@@ -1,20 +1,18 @@
-from testbot.code import SupportedLangs, Linter
+from testbot.code import SupportedLangs
 from testbot.llm import LLMModel
 from testbot.store.store import TestBotStore
 
 from pathlib import Path
 
 class WorkFlow:
+    """
+    Base class for workflow, handles generic logging
+    """
     def __init__(self, 
-                 repo_name: str, 
-                 repo_path: Path, 
                  lm: LLMModel,
-                 store: TestBotStore,
-                 lang: SupportedLangs):
-        self._lang = lang
-        self._linter = Linter(lang)
-        self._repo_name = repo_name
-        self._repo_path = repo_path
-
+                 store: TestBotStore):
         self._lm = lm
         self._store = store
+
+    def run(self):
+        raise NotImplementedError("Run method not implemented")
