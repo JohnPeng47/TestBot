@@ -9,6 +9,7 @@ from pathlib import Path
 from colorama import Fore, Style
 from pathlib import Path
 from typing import List, Set
+import os
 
 # support for all strings as multi-line
 import yaml
@@ -102,3 +103,20 @@ def red_text(text: str) -> str:
 def dim_text(text: str) -> str:
     """Returns text in dim color using colorama"""
     return f"{Style.DIM}{text}{Style.RESET_ALL}"
+
+def load_env(env_path: str = ".env") -> None:
+    """Load environment variables from a .env file into os.environ.
+    
+    Args:
+        env_path: Path to the .env file. Defaults to ".env" in current directory.
+    """
+    try:
+        with open(env_path) as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#"):
+                    key, value = line.split("=", 1)
+                    print("Setting env variable: ", key, value)
+                    os.environ[key.strip()] = value.strip().strip("\"'")
+    except FileNotFoundError:
+        print(f"Warning: {env_path} file not found")

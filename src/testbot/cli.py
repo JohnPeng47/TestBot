@@ -1,7 +1,10 @@
 import click
-from testbot.store import JsonStore, RepoConfig
-from testbot.workflow.init.core import InitRepo
+from pathlib import Path
 
+from testbot.store import JsonStore
+from testbot.workflow.init.core import InitRepo
+from testbot.llm import LLMModel
+from testbot.utils import load_env
 
 
 @click.group()
@@ -17,10 +20,12 @@ def repo():
 
 
 @repo.command()
-def init():
+@click.argument("repo_path")
+@click.option("--language", default=None)
+def init(repo_path, language):
     """Initialize a new test repository"""
     store = JsonStore()
-    workflow = InitRepo(None, store)
+    workflow = InitRepo(Path(repo_path), LLMModel(), store, language=language)
     workflow.run()
 
 
@@ -30,6 +35,10 @@ def init():
 #     store = JsonStore()
 #     # TODO: Implement repository deletion
 
-
 def main():
+    load_env() # load LLM API keys
+
     cli()
+
+if __name__ == "__main__":
+    main()

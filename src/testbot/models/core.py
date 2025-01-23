@@ -19,6 +19,8 @@ class RepoConfig(SQLModel, table=True):
     repo_name: str
     url: str
     source_folder: str
+    language: Optional[str] = None
+    
     # cloned_folders: Optional[List[str]] = Field(default=[], sa_type=JSON)
 
     def __init__(self, **data):

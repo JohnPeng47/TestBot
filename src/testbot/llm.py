@@ -15,6 +15,7 @@ from litellm import completion
 from litellm.types.utils import ModelResponse
 from pydantic import BaseModel
 
+
 # TODO: add token cost
 from testbot.utils import green_text
 
