@@ -2,6 +2,7 @@ import click
 from pathlib import Path
 from git import Repo
 from datetime import datetime
+import sys
 
 from testbot.store import JsonStore
 from testbot.workflow import InitRepo, TestDiffWorkflow
@@ -9,7 +10,7 @@ from testbot.llm import LLMModel
 from testbot.utils import load_env
 from testbot.diff import CommitDiff
 
-def install_hooks(repo_path=".", dry_run = True):
+def install_hooks(repo_path=".", dry_run=False):
     """Install git hooks for the repository"""
     try:
         repo = Repo(repo_path)
@@ -58,37 +59,40 @@ def repo():
     """Commands for managing test repositories"""
     pass
 
+# TODO: put this under a different command or something
 # TOOD: let's also make this work on staging as wlell
+# TODODESIGN: consider adding an interactive test environment to this
 @repo.command()
 @click.option("--dry-run", is_flag=True, help="For testing if hook installed")
 def pre_commit(dry_run):
     """Run pre-commit checks on staged changes"""
 
     if dry_run:
+        # NOTE: writing to stderr cuz git hooks convention, prolly unbuffered, 
+        # and clears room for scripts that are depending on stdout output to be piped
+        sys.stderr.write("Install success!\n")
         return "Install success!"
 
     store = JsonStore()
     try:
         repo = Repo('.')
-        diff = repo.index.diff('HEAD', create_patch=True)
-        if not diff:
-            print("No staged changes found")
-            return 0
-            
-        patch = '\n'.join(d.diff.decode('utf-8') for d in diff)
+        patch = repo.git.diff('HEAD', cached=True)  # 'cached' means staged changes
+        if not patch:
+            sys.stderr.write("No staged changes found\n")
+            sys.exit(0)
         
-        # Create commit diff object
         commit = CommitDiff(
             patch=patch,
             timestamp=datetime.now().isoformat()
         )
+        sys.stderr.write(f"Changed files: {commit.src_files}\n")
+        sys.exit(0)        
         
-        workflow = TestDiffWorkflow(commit, LLMModel(), store)
-        return workflow.run()
-        
+        # workflow = TestDiffWorkflow(commit, LLMModel(), store)
+        # workflow.run()
     except Exception as e:
-        print(f"Error in pre-commit check: {e}")
-        return 1
+        sys.stderr.write(f"Error in pre-commit check: {e}\n")
+        sys.exit(1)
 
 @repo.command()
 @click.argument("repo_path")
@@ -99,7 +103,7 @@ def init(repo_path, language, limit):
     store = JsonStore()
     workflow = InitRepo(Path(repo_path), LLMModel(), store, language=language, limit=limit)
     workflow.run()
-    # install_hooks()
+    install_hooks(repo_path=repo_path)
 
 # @repo.command()
 # def delete():
@@ -110,7 +114,6 @@ def init(repo_path, language, limit):
 
 def main():
     load_env() # load LLM API keys
-
     cli()
 
 if __name__ == "__main__":

@@ -128,5 +128,5 @@ class InitRepo(WorkFlow):
                         )
                     )
             processed_files += 1
-            if processed_files > self._limit:
+            if self._limit and processed_files > self._limit:
                 break

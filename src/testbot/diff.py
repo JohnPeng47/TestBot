@@ -247,8 +247,8 @@ class CommitDiff:
         if not patch:
             raise DiffsNotFoundException("Empty patch file argument")
         try:
-            self.diffs = self._segment_diffs(patch)
-            self.files = [d.filepath for d in self.diffs]
+            self.diffs: List[Diff] = self._segment_diffs(patch)
+            self.files: List[Diff] = [d.filepath for d in self.diffs]
             self.hunks = [hunk for d in self.diffs for hunk in d.hunks]
             self._timestamp = timestamp
         except Exception as e:
@@ -307,6 +307,10 @@ class CommitDiff:
     # def __str__(self):
     #     return self.code_diff + "\n" + self.tests_diff
 
+    @property
+    def src_files(self) -> List[str]:
+        return [d.filepath for d in self.diffs]
+    
     @property
     def test_files(self) -> List[str]:
         return [d.filepath for d in self.diffs if self.is_test_file(d.filepath)]

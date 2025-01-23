@@ -2,7 +2,7 @@
   "JohnPeng47/TestRepo": {
     "repo_name": "JohnPeng47/TestRepo",
     "url": "git@github.com:JohnPeng47/TestRepo.git",
-    "source_folder": "/home/ubuntu/cowboy-local/tests/test_repo",
+    "source_folder": "/home/ubuntu/cowboy-local/tests/test_repos/test_repo",
     "language": null,
     "id": null
   },

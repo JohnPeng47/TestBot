@@ -116,7 +116,6 @@ def load_env(env_path: str = ".env") -> None:
                 line = line.strip()
                 if line and not line.startswith("#"):
                     key, value = line.split("=", 1)
-                    print("Setting env variable: ", key, value)
                     os.environ[key.strip()] = value.strip().strip("\"'")
     except FileNotFoundError:
         print(f"Warning: {env_path} file not found")
