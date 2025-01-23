@@ -65,7 +65,7 @@ log/*.log
 alembic.ini
 run
 
-tests/test_repo
+tests/test_repos
 log/*
 src/eval/datasets/*
 src/eval/output/*

@@ -5,7 +5,7 @@ from pathlib import Path
 import shutil
 from testbot.store.json_store import JsonStore
 
-TEST_REPO = Path(__file__).parent / "test_repo"
+TEST_REPO = Path(__file__).parent / "test_repos/test_repo"
 TEST_DATA_DIR = Path(__file__).parent / "data"
 
 @fixture

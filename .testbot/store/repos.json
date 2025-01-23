@@ -5,5 +5,12 @@
     "source_folder": "/home/ubuntu/cowboy-local/tests/test_repo",
     "language": null,
     "id": null
+  },
+  "Textualize/textual": {
+    "repo_name": "Textualize/textual",
+    "url": "https://github.com/Textualize/textual.git",
+    "source_folder": "/home/ubuntu/cowboy-local/tests/test_repos/textual",
+    "language": null,
+    "id": null
   }
 }

@@ -75,11 +75,14 @@ class InitRepo(WorkFlow):
     def run(self):
         self._create_repo_config()
         lang = self._identify_language()
-
-        print("Detected lang: ", lang)
         
+        # NOTE: handling multiple root paths?
         root_path = self._repo_path
-        for f in self._repo_path.rglob("*"):
+        processed_files = 0
+        # NOTE: the module detection code below *should* work for all languages
+        # if we also normalize the module path to be in dotted notation ie. mod_a.mod_b.mod_c
+        # for f in self._repo_path.rglob(f"*.{EXTENSIONS[lang]}"):
+        for f in self._repo_path.rglob(f"*"):
             if any(f.match(p) for p in TEST_PATTERNS[lang]):
                 target_files = []
 
@@ -93,18 +96,26 @@ class InitRepo(WorkFlow):
                 )
 
                 for module in modules.module_names:
-                    print("Module: ", module)
-                    mod_path = Path(*module.split("."))
-                    full_path = root_path / (str(mod_path) + EXTENSIONS[lang])
+                    rel_mod_path = Path(*module.split("."))
+                    mod_path = root_path / (str(rel_mod_path) + EXTENSIONS[lang])
 
-                    print("Module path: ", full_path)
+                    # print("Module path: ", mod_path)
+                    # print("Module: ", module)
 
-                    if not full_path.exists():
-                        # TODO: add handling for this case
-                        raise Exception("WTF!")
-                        continue
+                    if not mod_path.exists():
+                        # use matching filename to find the actual root pat
+                        for source_path in self._repo_path.rglob(f"**/{mod_path.name}"):
+                            root_path = Path(*[p for p in source_path.parts][:-1])
+                            mod_path = root_path / mod_path.name
 
-                    target_files.append(str(full_path.resolve()))
+                            # print("New root path: ", root_path)
+                            # print("New module path: ", mod_path)
+
+                            # Idk ....
+                            if not mod_path.exists():
+                                raise Exception()
+
+                    target_files.append(str(mod_path.resolve()))
 
                 if target_files:
                     self._store.update_or_create_testfile_data(
@@ -116,3 +127,6 @@ class InitRepo(WorkFlow):
                             # test_metadata={"type": "unit"}
                         )
                     )
+            processed_files += 1
+            if processed_files > self._limit:
+                break

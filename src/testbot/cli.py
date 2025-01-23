@@ -22,10 +22,11 @@ def repo():
 @repo.command()
 @click.argument("repo_path")
 @click.option("--language", default=None)
-def init(repo_path, language):
+@click.option("--limit", type=int, default=None, help="Limit the number of test files to map back to source")
+def init(repo_path, language, limit):
     """Initialize a new test repository"""
     store = JsonStore()
-    workflow = InitRepo(Path(repo_path), LLMModel(), store, language=language)
+    workflow = InitRepo(Path(repo_path), LLMModel(), store, language=language, limit=limit)
     workflow.run()
 
 
