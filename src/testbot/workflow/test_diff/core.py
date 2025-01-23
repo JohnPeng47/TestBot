@@ -6,7 +6,8 @@ from testbot.store.store import TestBotStore
 
 from pathlib import Path
 
-class PreCommit(WorkFlow):
+class TestDiffWorkflow(WorkFlow):
+    """Generates test cases for a code diff"""
     def __init__(self, 
                  commit: CommitDiff,
                  repo_name: str, 
