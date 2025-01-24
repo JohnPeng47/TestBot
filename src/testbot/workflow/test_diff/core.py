@@ -48,7 +48,7 @@ class TestDiffWorkflow(WorkFlow):
         found_marker = False
         
         for line in parts:
-            if "NEW CODE ALERT" in line:
+            if "NEW_CODE_ALERT" in line:
                 found_marker = True
                 continue
                 
@@ -90,7 +90,6 @@ class TestDiffWorkflow(WorkFlow):
             if op == RecommendedOp.NO_ACTION:
                 continue
 
-            # not handling modify test cases for now
             if op == RecommendedOp.NEW_TESTCASE:
                 test_files = self._store.get_testfiles_from_srcfile(src_file)
                 src_and_test.append((src_file, test_files))
