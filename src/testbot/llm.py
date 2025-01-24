@@ -34,11 +34,8 @@ SHORT_NAMES = {
     "deepseek" : "deepseek/deepseek-chat"
 }
 
-class LLMException(Exception):
+class LLMVerificationError(Exception):
     pass
-
-class FakeAIMessage(BaseModel):
-    content: str
 
 class LLMModel:
     """
@@ -264,11 +261,14 @@ class LMP[T]:
     prompt: str
     response_format: Type[T]
 
-    def _prepare_prompt(self, **kwargs) -> str:
-        return jinja2.Template(self.prompt).render(**kwargs)
+    def _prepare_prompt(self, **prompt_args) -> str:
+        return jinja2.Template(self.prompt).render(**prompt_args)
 
-    def _verify_or_raise(self, res, **kwargs):
+    def _verify_or_raise(self, res, **prompt_args):
         return True
+
+    def _process_result(self, res, **prompt_args) -> Any:
+        return res
 
     def invoke(self, 
                model: LLMModel,
@@ -278,8 +278,8 @@ class LMP[T]:
                use_cache: bool = False,
                # gonna have to manually specify the args to pass into model.invoke
                # or do some arg merging shit here
-               **kwargs) -> T | str:
-        prompt = self._prepare_prompt(**kwargs)
+               **prompt_args) -> Any:
+        prompt = self._prepare_prompt(**prompt_args)
 
         current_retry = 1
         while current_retry <= max_retries:
@@ -288,10 +288,10 @@ class LMP[T]:
                                    model_name=model_name,
                                    response_format=self.response_format,
                                    use_cache=use_cache)
-                self._verify_or_raise(res, **kwargs)
+                self._verify_or_raise(res, **prompt_args)
 
                 return res
-            except Exception as e:
+            except LLMVerificationError as e:
                 current_retry += 1
                 
                 if current_retry > max_retries:
