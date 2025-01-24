@@ -28,3 +28,6 @@ class GitCommitContext:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.repo.git.reset("--hard", self.original_commit)
+
+def normalize_strings(string):
+    return string.strip().replace("\r\n", "\n")

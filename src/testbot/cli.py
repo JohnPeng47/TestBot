@@ -86,10 +86,10 @@ def pre_commit(dry_run):
             timestamp=datetime.now().isoformat()
         )
         sys.stderr.write(f"Changed files: {commit.src_files}\n")
-        sys.exit(0)        
         
-        # workflow = TestDiffWorkflow(commit, LLMModel(), store)
-        # workflow.run()
+        workflow = TestDiffWorkflow(commit, LLMModel(), store)
+        workflow.run()
+        
     except Exception as e:
         sys.stderr.write(f"Error in pre-commit check: {e}\n")
         sys.exit(1)

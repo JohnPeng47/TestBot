@@ -4,12 +4,10 @@ from pathlib import Path
 
 from ..models.core import RepoConfig, TestFileData
 
-
-# TODO: consider adding a user parameter to support serverside?
 class TestBotStore(ABC):
     def __init__(self):
         pass
-
+    
     @abstractmethod
     def create_repoconfig(self, repo_config: RepoConfig) -> Any | None:
         pass

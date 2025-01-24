@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from typing import Optional, Any
+from typing import Optional, Any, List
 
 from testbot.config import STORE_PATH
 from .store import TestBotStore
@@ -49,18 +49,19 @@ class JsonStore(TestBotStore):
         tests[tf_data.filepath] = tf_data.dict()
         self._write_json(self.tests_file, tests)
         return tf_data
-
-    def get_testfiles_from_srcfile(self, source_file: Path) -> Optional[TestFileData]:
+    
+    def get_testfiles_from_srcfile(self, source_file: Path) -> List[TestFileData]:
         tests = self._read_json(self.tests_file)
         source_file_str = str(source_file)
         
-        # Look for test files that map to this source file
+        # Look for test files that have this source file in their targeted files
+        matching_tests = []
         for _, test_data in tests.items():
-            if test_data.get("source_file") == source_file_str:
-                return TestFileData(**test_data)
+            if source_file_str in test_data.get("targeted_files", []):
+                matching_tests.append(TestFileData(**test_data))
                 
-        return None
-
+        return matching_tests
+    
     def _read_json(self, file_path: Path) -> dict:
         with open(file_path, "r") as f:
             return json.load(f)

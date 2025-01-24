@@ -11,7 +11,7 @@ class Modules(BaseModel):
 # to standardize module parsing
 class IdentifyModules(LMP):
     prompt = """
-{test_file}
+{{test_file}}
 
 This is the definition of a module: a single file where imports are source:
 from a.b import (

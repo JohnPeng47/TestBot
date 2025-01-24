@@ -6,6 +6,7 @@ import hashlib
 import json
 import functools
 import time
+import jinja2
 
 from pydantic import BaseModel
 import tiktoken
@@ -47,6 +48,7 @@ class LLMModel:
     
     def __init__(
         self,
+        use_cache: bool = False,
         configpath: Path = Path(__file__).parent / "cache.yaml",
         dbpath: Path = Path(__file__).parent / "llm_cache.db"
     ) -> None:
@@ -56,6 +58,7 @@ class LLMModel:
         Args:
             provider: The name of the model provider (e.g., "openai", "anthropic")
         """
+        self.use_cache = use_cache
         self.config = self._read_config(configpath)
 
         # Initialize cache-related attributes
@@ -162,10 +165,13 @@ class LLMModel:
                     *, 
                     model_name: str = "gpt-4o", 
                     response_format: Optional[Type[BaseModel]] = None, 
-                    use_cache: bool = False, 
+                    use_cache: Optional[bool] = None,
                     delete_cache: bool = False,
                     key: int = 0,
                     **kwargs):
+            
+            # Use instance default if use_cache is None
+            use_cache = self.use_cache if use_cache is None else use_cache
             
             # Track the call
             caller_filename, caller_function = self._get_caller_info()
@@ -259,7 +265,7 @@ class LMP[T]:
     response_format: Type[T]
 
     def _prepare_prompt(self, **kwargs) -> str:
-        return self.prompt.format(**kwargs)
+        return jinja2.Template(self.prompt).render(**kwargs)
 
     def _verify_or_raise(self, res, **kwargs):
         return True

@@ -228,17 +228,12 @@ class Diff:
 class DiffsNotFoundException(Exception):
     pass
 
-
-# this class needs a rewrite ...
-# TODO: add file mode to each diff chunk
 class CommitDiff:
     """
     Class to represent a diff/patch
 
     FYI patch is a diff that can be applied directly to a filepath
     """
-
-    # TODO: Too much logic in the __init__ method, move inside methods instead
     def __init__(
         self,
         patch: str,
@@ -347,3 +342,6 @@ class CommitDiff:
 
             print(f"Error parsing diff:\n{e}")
             traceback.print_exc()
+
+    def __str__(self):
+        return "\n".join([str(diff) for diff in self.diffs])
