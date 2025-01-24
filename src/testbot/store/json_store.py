@@ -50,12 +50,16 @@ class JsonStore(TestBotStore):
         self._write_json(self.tests_file, tests)
         return tf_data
 
-    def get_testfile_data(self, tf_path: Path) -> TestFileData:
+    def get_testfiles_from_srcfile(self, source_file: Path) -> Optional[TestFileData]:
         tests = self._read_json(self.tests_file)
-        path_str = str(tf_path)
-        if path_str not in tests:
-            raise KeyError(f"Test file {path_str} not found")
-        return TestFileData(**tests[path_str])
+        source_file_str = str(source_file)
+        
+        # Look for test files that map to this source file
+        for _, test_data in tests.items():
+            if test_data.get("source_file") == source_file_str:
+                return TestFileData(**test_data)
+                
+        return None
 
     def _read_json(self, file_path: Path) -> dict:
         with open(file_path, "r") as f:

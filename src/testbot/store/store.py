@@ -11,7 +11,7 @@ class TestBotStore(ABC):
         pass
 
     @abstractmethod
-    def create_repoconfig(self, repo_config: RepoConfig) -> Optional[Any]:
+    def create_repoconfig(self, repo_config: RepoConfig) -> Any | None:
         pass
     
     @abstractmethod
@@ -23,11 +23,9 @@ class TestBotStore(ABC):
         pass
 
     @abstractmethod
-    def update_or_create_testfile_data(self, tf_data: TestFileData) -> Optional[Any]:
+    def update_or_create_testfile_data(self, tf_data: TestFileData) -> Any | None:
         pass
 
     @abstractmethod
-    def get_testfile_data(self, tf_path: Path) -> TestFileData:
+    def get_testfiles_from_srcfile(self, source_file: Path) -> TestFileData | None:
         pass
-
-

@@ -13,12 +13,12 @@ class TestDiffWorkflow(WorkFlow):
                  repo_name: str, 
                  repo_path: Path, 
                  lm: LLMModel,
-                 store: TestBotStore,
+                store: TestBotStore,
                  lang: SupportedLangs):
         super().__init__(repo_name, repo_path, lm, store, lang)
         
         self._commit = commit
     
     # def run(self):
-    #     print()
+        
     
