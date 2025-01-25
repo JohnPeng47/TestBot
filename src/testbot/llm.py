@@ -16,8 +16,6 @@ from litellm import completion
 from litellm.types.utils import ModelResponse
 from pydantic import BaseModel
 
-
-# TODO: add token cost
 from testbot.utils import green_text
 
 client = instructor.from_litellm(completion)
@@ -289,8 +287,8 @@ class LMP[T]:
                                    response_format=self.response_format,
                                    use_cache=use_cache)
                 self._verify_or_raise(res, **prompt_args)
-
-                return res
+                return self._process_result(res, **prompt_args)
+            
             except LLMVerificationError as e:
                 current_retry += 1
                 
@@ -301,3 +299,92 @@ class LMP[T]:
                 current_delay = retry_delay * (2 ** (current_retry - 1))
                 time.sleep(current_delay)
                 print(f"Retry attempt {current_retry}/{max_retries} after error: {str(e)}. Waiting {current_delay}s")
+
+# ALTDESIGN:
+# -> using jinja templating
+# -> but figure this way is more flexible by keeping everything in python code,
+# potentially need to 
+from typing import Tuple
+class GeneratedCode(BaseModel):
+    code: str
+
+class GenerateCodeInsert(LMP):    
+    APPEND_CODE_PROMPT = """
+The code that you write need to be inserted into the file labeled as (INSERTION_TARGET):
+1. First generate a couple of lines from the INSERTION_TARGET, at the point that you plan on inserting your new code
+2. Follow this by generating a comment in whatever language the INSERTION_TARGET is in, saying: NEW_CODE_ALERT
+3. Then generate your new code
+
+Now generate your code:
+"""
+    response_format = GeneratedCode
+
+    def __init__(self, target_code: str = None):
+        self._target_code = target_code
+        
+    def _prepare_prompt(self, **prompt_args) -> str:
+        prompt = super()._prepare_prompt(**prompt_args)
+        if "INSERTION_TARGET" not in prompt:
+            raise ValueError("GenerateCodeInsert Prompt must contain INSERTION_TARGET")
+        
+        final_prompt = prompt + self.APPEND_CODE_PROMPT
+        return final_prompt
+
+    # TODO: maybe its better to have these split here
+    def _merge_code(self, code_before: str, new_code: str) -> str:
+        """Apply the code sandwich (context + new code) to the target code file.
+        
+        Args:
+            code_sandwhich: Output from LLM containing context lines and new code
+            target_code: Original test file content
+
+        Returns:
+            Updated test file content with new code inserted
+        """
+        if not self._target_code:
+            raise ValueError("_target_code not defined on GenerateCodeInsert")
+
+        print("[TARGET CODE]: ", self._target_code)
+        print("[CODE BEFORE]: ", code_before)
+        
+        insert_pos = self._target_code.find(code_before)
+        if insert_pos == -1:
+            raise ValueError("code_before not found in target code")
+
+        insert_pos += len(code_before)
+        return (
+            self._target_code[:insert_pos] 
+            + new_code
+            + self._target_code[insert_pos:]
+        )
+
+    def _parse_generated_code(self, new_code: str) -> Tuple[str, str]:
+        parts = new_code.split("\n")
+        
+        # Find the context and new code
+        context_before = []
+        new_code_lines = []
+        found_marker = False
+        
+        for line in parts:
+            if "NEW_CODE_ALERT" in line:
+                found_marker = True
+                continue
+            if not found_marker:
+                context_before.append(line)
+            else:
+                new_code_lines.append(line)
+
+        if not found_marker:
+            raise LLMVerificationError("NEW_CODE_ALERT not found in response")
+        
+        print("[CONTEXT BEFORE]: ", "\n".join(context_before))
+        print("[NEW CODE]: ", "\n".join(new_code_lines))
+
+        return "\n".join(context_before), "\n".join(new_code_lines)
+    
+    def _process_result(self, res: GeneratedCode, **prompt_args):
+        print("[GENERATED CODE]: ", res.code)
+
+        code_before, new_code = self._parse_generated_code(res.code)
+        return self._merge_code(code_before, new_code)

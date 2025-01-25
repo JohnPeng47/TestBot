@@ -115,7 +115,7 @@
     "name": "test_b.py",
     "filepath": "tests/test_repos/test_repo/tests/test_b.py",
     "targeted_files": [
-      "/home/ubuntu/cowboy-local/tests/test_repos/test_repo/b.py"
+      "tests/test_repos/test_repo/b.py"
     ],
     "test_metadata": {}
   },
@@ -124,7 +124,7 @@
     "name": "test_string_utils.py",
     "filepath": "tests/test_repos/test_repo/tests/test_string_utils.py",
     "targeted_files": [
-      "/home/ubuntu/cowboy-local/tests/test_repos/test_repo/string_utils.py"
+      "tests/test_repos/test_repo/string_utils.py"
     ],
     "test_metadata": {}
   },
@@ -133,7 +133,7 @@
     "name": "test_math_utils.py",
     "filepath": "tests/test_repos/test_repo/tests/test_math_utils.py",
     "targeted_files": [
-      "/home/ubuntu/cowboy-local/tests/test_repos/test_repo/math_utils.py"
+      "tests/test_repos/test_repo/math_utils.py"
     ],
     "test_metadata": {}
   },
@@ -142,7 +142,7 @@
     "name": "test_c.py",
     "filepath": "tests/test_repos/test_repo/tests/test_c.py",
     "targeted_files": [
-      "/home/ubuntu/cowboy-local/tests/test_repos/test_repo/c.py"
+      "tests/test_repos/test_repo/c.py"
     ],
     "test_metadata": {}
   },
@@ -151,7 +151,7 @@
     "name": "test_a.py",
     "filepath": "tests/test_repos/test_repo/tests/test_a.py",
     "targeted_files": [
-      "/home/ubuntu/cowboy-local/tests/test_repos/test_repo/a.py"
+      "tests/test_repos/test_repo/a.py"
     ],
     "test_metadata": {}
   }

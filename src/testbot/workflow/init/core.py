@@ -3,6 +3,7 @@ from testbot.models import RepoConfig, TestFileData
 from testbot.store import TestBotStore
 from testbot.code import SupportedLangs, EXTENSIONS, TEST_PATTERNS
 
+from collections import defaultdict
 from pathlib import Path
 import git
 
@@ -75,6 +76,7 @@ class InitRepo(WorkFlow):
     def run(self):
         self._create_repo_config()
         lang = self._identify_language()
+        src_test_mapping = defaultdict(list)
         
         # NOTE: handling multiple root paths?
         root_path = self._repo_path
@@ -86,7 +88,7 @@ class InitRepo(WorkFlow):
             if any(f.match(p) for p in TEST_PATTERNS[lang]):
                 target_files = []
 
-                print(f"Resolving target source for {str(f)}")
+                print(f"[*] Resolving target source for {str(f)}")
 
                 test_content = open(f, "r").read()
                 modules = IdentifyModules().invoke(
@@ -115,7 +117,10 @@ class InitRepo(WorkFlow):
                             if not mod_path.exists():
                                 raise Exception()
 
-                    target_files.append(str(mod_path.resolve()))
+                    print("> found covered src file: ", mod_path)
+
+                    src_test_mapping[str(mod_path)].append(str(f))
+                    target_files.append(str(mod_path))
 
                 if target_files:
                     self._store.update_or_create_testfile_data(
@@ -129,4 +134,8 @@ class InitRepo(WorkFlow):
                     )
             processed_files += 1
             if self._limit and processed_files > self._limit:
+                print("Limit hit exiting...")
                 break
+
+        # TODO: write an integration test for this
+        return src_test_mapping

@@ -1,4 +1,4 @@
-from testbot.llm import LMP, LLMVerificationError
+from testbot.llm import LMP, GenerateCodeInsert, LLMVerificationError
 from pydantic import BaseModel
 from typing import List, Tuple
 from enum import Enum
@@ -13,7 +13,6 @@ class FilteredSrcFiles(BaseModel):
 
 # NOTE: ideally we can get *block level* src -> test mappings so we can better fit into prompt
 # instead of jamming all test case
-# 
 class FilterCommitFilesBatchedV1(LMP):
     """Filter out all changed files in single commit"""
 
@@ -39,50 +38,25 @@ a list of tuples in the form (source_file, RECOMMENDED_OP), where RECOMMENDED_OP
             raise LLMVerificationError("Response does not contain all changed source files")
 
 # PROMPTDESIGN: potentially combine this and the other into a single prompt
-class GeneratedCode(BaseModel):
-    code: str
-        
-class GenerateTestWithExisting(LMP):
+# DESIGN: we should log the patch and then the generated file (minus before_context)
+class GenerateTestWithExisting(GenerateCodeInsert):
     prompt = """
 Patch:
 {{patch}}
 
 Source file: 
-{{source_file}}
+{{source_filename}}
 
-Existing tests:
+Existing test cases (INSERTION_TARGET):
 {{existing_tests}}
 
-Given the patch and the source_file above, extend the existing test cases for the source file.
-The way you should generate your new code is as follows:
-1. First generate a couple of lines from the existing test, at the point that you plan on inserting your new code
-2. Follow this by generating a comment in whatever language the existing tests is in, saying: NEW_CODE_ALERT
-3. Then generate your new code
-
-Now generate your code:
+Write a new test case for the newly added code in the patch
 """
-    response_format = GeneratedCode
+    def _verify_or_raise(self, res, **prompt_args):
+        existing_tests = prompt_args["existing_tests"]        
+        code_before, _ = self._parse_generated_code(res.code)
 
-    def _verify_or_raise(self, res: GeneratedCode, **prompt_args):
-        existing_tests = prompt_args["existing_tests"]
-        parts = res.code.split("\n")
-        
-        # Find the context and new code
-        context_before = []
-        found_marker = False
-        for line in parts:
-            if "NEW_CODE_ALERT" in line:
-                found_marker = True
-                break
-
-            context_before.append(line)
-
-        code_before = "\n".join(context_before)
         if code_before not in existing_tests:
             raise LLMVerificationError("Context before NEW_CODE_ALERT not found in existing tests")
-
-        if not found_marker:
-            raise LLMVerificationError("NEW_CODE_ALERT not found in response")
-
-        if not context_before:
+        if not code_before:
             raise LLMVerificationError("No context found before NEW_CODE_ALERT")

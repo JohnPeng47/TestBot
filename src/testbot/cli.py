@@ -10,6 +10,21 @@ from testbot.llm import LLMModel
 from testbot.utils import load_env
 from testbot.diff import CommitDiff
 
+TEST_PATCH = """
+diff --git a/a.py b/a.py
+index 0d1bea4..c99da5d 100644
+--- a/a.py
++++ b/a.py
+@@ -10,4 +10,8 @@ def divide(a, b):
+    \"\"\"Divide a by b.\"\"\"
+    if b == 0:
+        raise ValueError(\"Cannot divide by zero\")
+
++def average(**args):
++    total = sum(args)
++    return total / len(args)
+"""
+
 def install_hooks(repo_path=".", dry_run=False):
     """Install git hooks for the repository"""
     try:
@@ -59,9 +74,7 @@ def repo():
     """Commands for managing test repositories"""
     pass
 
-# TODO: put this under a different command or something
-# TOOD: let's also make this work on staging as wlell
-# TODODESIGN: consider adding an interactive test environment to this
+# DESIGN: consider adding an interactive test environment to this
 @repo.command()
 @click.option("--dry-run", is_flag=True, help="For testing if hook installed")
 def pre_commit(dry_run):
@@ -86,12 +99,66 @@ def pre_commit(dry_run):
             timestamp=datetime.now().isoformat()
         )
         sys.stderr.write(f"Changed files: {commit.src_files}\n")
-        
+
         workflow = TestDiffWorkflow(commit, LLMModel(), store)
         workflow.run()
-        
     except Exception as e:
         sys.stderr.write(f"Error in pre-commit check: {e}\n")
+        sys.exit(1)
+
+
+@repo.command()
+@click.option("--dry-run", is_flag=True, help="For testing if hook installed")
+def pre_commit(dry_run):
+    """Run pre-commit checks on staged changes"""
+
+    if dry_run:
+        # NOTE: writing to stderr cuz git hooks convention, prolly unbuffered, 
+        # and clears room for scripts that are depending on stdout output to be piped
+        sys.stderr.write("Install success!\n")
+        return "Install success!"
+
+    store = JsonStore()
+    try:
+        repo = Repo('.')
+        patch = repo.git.diff('HEAD', cached=True)  # 'cached' means staged changes
+        if not patch:
+            sys.stderr.write("No staged changes found\n")
+            sys.exit(0)
+        
+        commit = CommitDiff(
+            patch=patch,
+            timestamp=datetime.now().isoformat()
+        )
+        sys.stderr.write(f"Changed files: {commit.src_files}\n")
+
+        workflow = TestDiffWorkflow(commit, LLMModel(), store)
+        workflow.run()
+    except Exception as e:
+        sys.stderr.write(f"Error in pre-commit check: {e}\n")
+        sys.exit(1)
+
+@repo.command()
+def test_pre_commit():
+    """Run pre-commit checks on staged changes"""
+    store = JsonStore()
+    try:
+        commit = CommitDiff(
+            patch=TEST_PATCH,
+            timestamp=datetime.now().isoformat()
+        )
+        sys.stderr.write(f"Changed files: {commit.src_files}\n")
+        workflow = TestDiffWorkflow(commit, 
+                                    "test_repo", 
+                                    Path("tests/test_repos/test_repo"),
+                                    LLMModel(), 
+                                    store,
+                                    "python")
+        workflow.run()
+    except Exception as e:
+        import traceback
+        sys.stderr.write(f"Error in pre-commit check: {e}\n")
+        sys.stderr.write(f"Stacktrace:\n{traceback.format_exc()}\n")
         sys.exit(1)
 
 @repo.command()
@@ -109,11 +176,10 @@ def init(repo_path, language, limit):
 # def delete():
 #     """Delete an existing test repository"""
 #     store = JsonStore()
-#     # TODO: Implement repository deletion
-
 
 def main():
     load_env() # load LLM API keys
+    
     cli()
 
 if __name__ == "__main__":
