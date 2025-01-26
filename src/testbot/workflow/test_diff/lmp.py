@@ -1,4 +1,8 @@
-from testbot.llm import LMP, GenerateCodeInsert, LLMVerificationError
+from testbot.llm import (
+    LMP, 
+    CodeEdit, 
+    LLMVerificationError
+)
 from pydantic import BaseModel
 from typing import List, Tuple
 from enum import Enum
@@ -39,24 +43,17 @@ a list of tuples in the form (source_file, RECOMMENDED_OP), where RECOMMENDED_OP
 
 # PROMPTDESIGN: potentially combine this and the other into a single prompt
 # DESIGN: we should log the patch and then the generated file (minus before_context)
-class GenerateTestWithExisting(GenerateCodeInsert):
+class GenerateTestWithExisting(CodeEdit):
     prompt = """
+TASK:
 Patch:
 {{patch}}
 
 Source file: 
 {{source_filename}}
 
-Existing test cases (INSERTION_TARGET):
+Existing test cases (APPEND_TARGET):
 {{existing_tests}}
 
 Write a new test case for the newly added code in the patch
 """
-    def _verify_or_raise(self, res, **prompt_args):
-        existing_tests = prompt_args["existing_tests"]        
-        code_before, _ = self._parse_generated_code(res.code)
-
-        if code_before not in existing_tests:
-            raise LLMVerificationError("Context before NEW_CODE_ALERT not found in existing tests")
-        if not code_before:
-            raise LLMVerificationError("No context found before NEW_CODE_ALERT")

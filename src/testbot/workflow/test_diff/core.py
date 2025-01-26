@@ -7,7 +7,7 @@ from .lmp import (
     FilterCommitFilesBatchedV1, 
     RecommendedOp, 
     FilteredSrcFiles,
-    GenerateTestWithExisting
+    GenerateTestWithExisting,
 )
 from ..base import WorkFlow
 
@@ -30,9 +30,9 @@ class TestDiffWorkflow(WorkFlow):
         self._commit = commit
 
     # Current(V1): only making use of changed code (non-test) files
-    # DESIGN(V2): make use of the existing test mappings to modify test cases
-    # DESIGN(V3): currently ignoring test files, but we need to handle special case
-    # DESIGN(V4): handle case of unmapped new file
+    # IMPROVE(V2): make use of the existing test mappings to modify test cases
+    # IMPROVE(V3): currently ignoring test files, but we need to handle special case
+    # IMPROVE(V4): handle case of unmapped new file
     # where the test file is also included with the commit
     def run(self):
         # first try to filter out useless files

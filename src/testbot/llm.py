@@ -1,4 +1,5 @@
-from typing import Any, Dict, Optional, Type
+from typing import Any, Dict, Optional, Type, List, Tuple
+import xml.etree.ElementTree as ET
 import inspect
 from pathlib import Path
 import sqlite3
@@ -7,6 +8,7 @@ import json
 import functools
 import time
 import jinja2
+import re
 
 from pydantic import BaseModel
 import tiktoken
@@ -34,6 +36,10 @@ SHORT_NAMES = {
 
 class LLMVerificationError(Exception):
     pass
+
+class ChatMessage(BaseModel):
+    role: str
+    content: str
 
 class LLMModel:
     """
@@ -224,23 +230,26 @@ class LLMModel:
 
     @cache_llm_response
     def invoke(self, 
-               prompt: str,
+               prompt: str | List[ChatMessage],
                *, 
                model_name: str = "gpt-4o", 
                response_format: Optional[Type[BaseModel]] = None,
                use_cache: bool = True,
                **kwargs) -> Any:
         """Modified invoke method with caching."""
-        
+
+        if isinstance(prompt, str):
+            messages = [{
+                "role": "user",
+                "content": prompt,
+            }]
+        elif isinstance(prompt, list):
+            messages = [m.dict() for m in prompt]
+            
         model_name = SHORT_NAMES[model_name]
         res = client.chat.completions.create(
             model=model_name,
-            messages=[
-                {
-                    "role": "user",
-                    "content": prompt,
-                }
-            ],
+            messages=messages,
             response_model=response_format,
             **kwargs
         )
@@ -300,91 +309,196 @@ class LMP[T]:
                 time.sleep(current_delay)
                 print(f"Retry attempt {current_retry}/{max_retries} after error: {str(e)}. Waiting {current_delay}s")
 
-# ALTDESIGN:
-# -> using jinja templating
-# -> but figure this way is more flexible by keeping everything in python code,
-# potentially need to 
-from typing import Tuple
-class GeneratedCode(BaseModel):
-    code: str
+class AppendOp(BaseModel):
+    targeted_line: str
+    new_code: str
 
-class GenerateCodeInsert(LMP):    
+    def apply(self, target_code: str) -> str:
+        return target_code.replace(self.targeted_line, self.targeted_line + "\n" + self.new_code)
+    
+class ModifyOp(BaseModel):
+    targeted_line: str
+    new_code: str
+
+    def apply(self, target_code: str) -> str:
+        return target_code.replace(self.targeted_line, self.new_code)
+
+# IMPROVE: problem with append not generating newlines
+# for example:
+#     with pytest.raises(ValueError, match="Cannot divide by zero"):
+#         divide(5, 0)
+# def test_average():
+#     assert average(1, 2, 3) == 2
+class CodeEdit(LMP):    
+    KEYWORDS = ["TASK", "APPEND_TARGET"]
     APPEND_CODE_PROMPT = """
-The code that you write need to be inserted into the file labeled as (INSERTION_TARGET):
-1. First generate a couple of lines from the INSERTION_TARGET, at the point that you plan on inserting your new code
-2. Follow this by generating a comment in whatever language the INSERTION_TARGET is in, saying: NEW_CODE_ALERT
-3. Then generate your new code
+Now generate code that implements TASK. The generated code must be added to the file labeled as APPEND_TARGET as a series of edit operations.
 
-Now generate your code:
-"""
-    response_format = GeneratedCode
+REQUIRED STEPS:
+1. Generate an ordered series of steps explaining how to accomplish TASK
+2. Generate a list of EDIT_OPS that implement those steps
+
+VALID EDIT_OPS:
+
+1. APPEND_OP - Used to add new code after an existing line
+   Structure:
+   <append_op>
+       <target_line>existing line to append after</target_line>
+       <new_code>code to be inserted</new_code>
+   </append_op>
+
+2. MODIFY_OP - Used to replace an existing line with new code
+   Structure:
+   <modify_op>
+       <target_line>existing line to modify</target_line>
+       <new_code>code to replace it with</new_code>
+   </modify_op>
+
+NOTE: All operations must be enclosed in <edit_op> tags
+
+EXAMPLES:
+
+-------- EXAMPLE 1: APPEND OPERATIONS --------
+
+Steps:
+1. Import sys module for exit functionality
+2. Add sys.exit() call at end of function
+
+<edit_op>
+<append_op>
+    <target_line>import os</target_line>
+    <new_code>import sys</new_code>
+</append_op>
+
+<append_op>
+    <target_line>    print("Hello, world!")</target_line>
+    <new_code>    sys.exit()</new_code>
+</append_op>
+</edit_op>
+
+-------- EXAMPLE 2: MIXED OPERATIONS --------
+
+Steps:
+1. Add logging import
+2. Replace print with logging
+3. Add logging configuration
+
+<edit_op>
+<append_op>
+    <target_line>import os</target_line>
+    <new_code>import logging</new_code>
+</append_op>
+
+<modify_op>
+    <target_line>print("Starting application...")</target_line>
+    <new_code>logging.info("Starting application...")</new_code>
+</modify_op>
+
+<append_op>
+    <target_line>import logging</target_line>
+    <new_code>logging.basicConfig(level=logging.INFO)</new_code>
+</append_op>
+</edit_op>
+
+-------- END EXAMPLES --------
+
+RESULTING FILE FORMAT:
+The final APPEND_TARGET file should look like this after applying the operations:
+
+import os
+import sys
+
+def main():
+    print("Hello, world!")
+    sys.exit()
+
+Now generate your code:"""
+    response_format = None
 
     def __init__(self, target_code: str = None):
         self._target_code = target_code
         
     def _prepare_prompt(self, **prompt_args) -> str:
         prompt = super()._prepare_prompt(**prompt_args)
-        if "INSERTION_TARGET" not in prompt:
-            raise ValueError("GenerateCodeInsert Prompt must contain INSERTION_TARGET")
+        
+        for k in self.KEYWORDS:
+            if k not in prompt:
+                raise ValueError(f"{k} not found in prompt")
         
         final_prompt = prompt + self.APPEND_CODE_PROMPT
         return final_prompt
-
-    # TODO: maybe its better to have these split here
-    def _merge_code(self, code_before: str, new_code: str) -> str:
-        """Apply the code sandwich (context + new code) to the target code file.
+    
+    def _extract_edit_ops(self, content: str) -> List[AppendOp | ModifyOp]:
+        """
+        Parse edit operations from an XML-formatted string while preserving indentation.
         
         Args:
-            code_sandwhich: Output from LLM containing context lines and new code
-            target_code: Original test file content
-
+            content (str): String containing edit operations in XML format
+            
         Returns:
-            Updated test file content with new code inserted
+            EditOps: Parsed operations in structured format
         """
-        if not self._target_code:
-            raise ValueError("_target_code not defined on GenerateCodeInsert")
-
-        print("[TARGET CODE]: ", self._target_code)
-        print("[CODE BEFORE]: ", code_before)
+        # Extract the XML portion
+        xml_match = re.search(r'<edit_op>.*?</edit_op>', content, re.DOTALL)
+        if not xml_match:
+            raise ValueError("No edit_op tags found in content")
         
-        insert_pos = self._target_code.find(code_before)
-        if insert_pos == -1:
-            raise ValueError("code_before not found in target code")
-
-        insert_pos += len(code_before)
-        return (
-            self._target_code[:insert_pos] 
-            + new_code
-            + self._target_code[insert_pos:]
-        )
-
-    def _parse_generated_code(self, new_code: str) -> Tuple[str, str]:
-        parts = new_code.split("\n")
+        xml_content = xml_match.group()
         
-        # Find the context and new code
-        context_before = []
-        new_code_lines = []
-        found_marker = False
+        # Parse XML while preserving whitespace
+        parser = ET.XMLParser()
+        root = ET.fromstring(xml_content, parser=parser)
         
-        for line in parts:
-            if "NEW_CODE_ALERT" in line:
-                found_marker = True
-                continue
-            if not found_marker:
-                context_before.append(line)
-            else:
-                new_code_lines.append(line)
-
-        if not found_marker:
-            raise LLMVerificationError("NEW_CODE_ALERT not found in response")
+        edit_ops = []
         
-        print("[CONTEXT BEFORE]: ", "\n".join(context_before))
-        print("[NEW CODE]: ", "\n".join(new_code_lines))
+        # Process all append operations
+        for append_op in root.findall('.//append_op'):
+            append_line = append_op.find('target_line')
+            new_code = append_op.find('new_code')
+            
+            if append_line is not None and new_code is not None:
+                # Preserve indentation by getting raw text content
+                append_line_text = ''.join(append_line.itertext()).rstrip()
+                new_code_text = ''.join(new_code.itertext()).rstrip()
+                
+                # Remove any common leading newlines
+                append_line_text = append_line_text.lstrip('\n')
+                new_code_text = new_code_text.lstrip('\n')
+                
+                edit_ops.append(
+                    AppendOp(
+                        targeted_line=append_line_text,
+                        new_code=new_code_text
+                    )
+                )
+        
+        # Process all modify operations
+        for modify_op in root.findall('.//modify_op'):
+            modify_line = modify_op.find('target_line')
+            new_code = modify_op.find('new_code')
+            
+            if modify_line is not None and new_code is not None:
+                # Preserve indentation by getting raw text content
+                modify_line_text = ''.join(modify_line.itertext()).rstrip()
+                new_code_text = ''.join(new_code.itertext()).rstrip()
+                
+                # Remove any common leading newlines
+                modify_line_text = modify_line_text.lstrip('\n')
+                new_code_text = new_code_text.lstrip('\n')
+                
+                edit_ops.append(
+                    ModifyOp(
+                        targeted_line=modify_line_text,
+                        new_code=new_code_text
+                    )
+                )
+        
+        return edit_ops
 
-        return "\n".join(context_before), "\n".join(new_code_lines)
-    
-    def _process_result(self, res: GeneratedCode, **prompt_args):
-        print("[GENERATED CODE]: ", res.code)
-
-        code_before, new_code = self._parse_generated_code(res.code)
-        return self._merge_code(code_before, new_code)
+    def _process_result(self, res: str, **prompt_args) -> str:
+        edit_ops = self._extract_edit_ops(res)
+        target_code = self._target_code
+        for op in edit_ops:
+            target_code = op.apply(target_code)
+            
+        return target_code
