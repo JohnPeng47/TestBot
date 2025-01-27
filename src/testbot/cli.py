@@ -168,6 +168,13 @@ def test_pre_commit():
 def init(repo_path, language, limit):
     """Initialize a new test repository"""
     store = JsonStore()
+    repo_path = Path(repo_path)
+    repo = store.get_repoconfig(
+        lambda x: x.source_folder == str(repo_path.resolve())
+    )
+    if repo:
+        store.delete_repoconfig(repo.repo_name)
+
     workflow = InitRepo(Path(repo_path), LLMModel(), store, language=language, limit=limit)
     workflow.run()
     install_hooks(repo_path=repo_path)

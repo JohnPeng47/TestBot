@@ -1,0 +1,2 @@
+class StoreDoesNotExist(Exception):
+    pass

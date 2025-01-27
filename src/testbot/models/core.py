@@ -1,3 +1,4 @@
+import os
 from sqlmodel import SQLModel, Field, JSON
 from typing import Optional, List
 
@@ -11,6 +12,15 @@ class TestFileData(SQLModel, table=True):
     targeted_files: List[str] = Field(default={}, sa_type=JSON)
     test_metadata: dict = Field(default={}, sa_type=JSON)
 
+    def __init__(self, **data):
+        super().__init__(**data)
+        self.validate_paths()
+
+    def validate_paths(self):
+        assert os.path.isabs(self.filepath)
+        for target_file in self.targeted_files:
+            assert os.path.isabs(target_file)
+
 class RepoConfig(SQLModel, table=True):
     """Configuration for a GitHub repository"""
     __tablename__ = "repo_configs"
@@ -20,13 +30,16 @@ class RepoConfig(SQLModel, table=True):
     url: str
     source_folder: str
     language: Optional[str] = None
-    
-    # cloned_folders: Optional[List[str]] = Field(default=[], sa_type=JSON)
 
     def __init__(self, **data):
         super().__init__(**data)
         self.url = self.validate_url(self.url)
 
+        self.validate_paths()
+
+    def validate_paths(self):
+        assert os.path.isabs(self.source_folder)
+            
     @classmethod
     def validate_url(cls, v):
         import re
