@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, Optional
+from typing import Any, Optional, Callable
 from pathlib import Path
 
 from ..models.core import RepoConfig, TestFileData
@@ -13,7 +13,7 @@ class TestBotStore(ABC):
         pass
     
     @abstractmethod
-    def get_repo_config(self, repo_name: str) -> RepoConfig:
+    def get_repoconfig(self, filter_fn: Callable[[RepoConfig], bool]) -> RepoConfig | None:
         pass
 
     @abstractmethod

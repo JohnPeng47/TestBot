@@ -24,7 +24,7 @@ class JsonStore(TestBotStore):
     def create_repoconfig(self, repo_config: RepoConfig) -> Optional[Any]:
         repos = self._read_json(self.repos_file)
         # overwrite old config if already exists
-        repos[repo_config.repo_name] = repo_config.dict()
+        repos[repo_config.repo_name] = repo_config
 
         print("Saving to repo: ", repo_config.repo_name)
         self._write_json(self.repos_file, repos)
@@ -38,15 +38,17 @@ class JsonStore(TestBotStore):
         del repos[repo_name]
         self._write_json(self.repos_file, repos)
 
-    def get_repo_config(self, repo_name: str) -> RepoConfig:
-        repos = self._read_json(self.repos_file)
-        if repo_name not in repos:
-            raise KeyError(f"Repository {repo_name} not found")
-        return RepoConfig(**repos[repo_name])
-
+    def get_repoconfig(self, filter_fn) -> RepoConfig:
+        try:
+            for repo in self._read_json(self.repos_file).values():
+                if filter_fn(repo):
+                    return repo
+        except StopIteration:
+            return None
+        
     def update_or_create_testfile_data(self, tf_data: TestFileData) -> Optional[Any]:
         tests = self._read_json(self.tests_file)
-        tests[tf_data.filepath] = tf_data.dict()
+        tests[tf_data.filepath] = tf_data
         self._write_json(self.tests_file, tests)
         return tf_data
     
@@ -57,15 +59,20 @@ class JsonStore(TestBotStore):
         # Look for test files that have this source file in their targeted files
         matching_tests = []
         for _, test_data in tests.items():
-            if source_file_str in test_data.get("targeted_files", []):
-                matching_tests.append(TestFileData(**test_data))
+            if source_file_str in test_data.targeted_files:
+                matching_tests.append(test_data)
                 
         return matching_tests
     
-    def _read_json(self, file_path: Path) -> dict:
+    def _read_json(self, file_path: Path) -> dict[str, RepoConfig] | dict[str, TestFileData]:
         with open(file_path, "r") as f:
-            return json.load(f)
+            data = json.load(f)
+            if file_path == self.repos_file:
+                return {k: RepoConfig(**v) for k, v in data.items()}
+            else:
+                return {k: TestFileData(**v) for k, v in data.items()}
 
-    def _write_json(self, file_path: Path, data: dict):
+    def _write_json(self, file_path: Path, data: dict[str, RepoConfig] | dict[str, TestFileData]):
         with open(file_path, "w") as f:
-            json.dump(data, f, indent=2)
+            json_data = {k: v.dict() for k, v in data.items()}
+            json.dump(json_data, f, indent=2)
