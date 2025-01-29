@@ -3,12 +3,20 @@ from testbot.models import RepoConfig, TestFileData
 from testbot.store import TestBotStore
 from testbot.code import SupportedLangs, EXTENSIONS, TEST_PATTERNS
 
+import fnmatch
 from collections import defaultdict
 from pathlib import Path
 import git
 
 from .lmp import IdentifyModules, Modules
 from ..base import WorkFlow
+
+EXCLUDE_PATTERNS = [
+    ".venv/*",
+    ".env/*",
+    ".build/*",
+    ".dist/*"
+]
 
 class LanguageNotSupported(Exception):
     """Raised when the language of the repo is not supported"""
@@ -85,6 +93,8 @@ class InitRepo(WorkFlow):
         # if we also normalize the module path to be in dotted notation ie. mod_a.mod_b.mod_c
         # for f in self._repo_path.rglob(f"*.{EXTENSIONS[lang]}"):
         for f in self._repo_path.rglob(f"*"):
+            if any(fnmatch.fnmatch(f, p) for p in EXCLUDE_PATTERNS):
+                continue
             if any(f.match(p) for p in TEST_PATTERNS[lang]):
                 target_files = []
 

@@ -9,7 +9,7 @@ from testbot.terminal import IO
 from testbot.store import JsonStore, StoreDoesNotExist
 from testbot.workflow import InitRepo, TestDiffWorkflow
 from testbot.llm import LLMModel
-from testbot.utils import load_env, green_text, hook_print
+from testbot.utils import load_env
 from testbot.diff import CommitDiff
 
 TEST_PATCH = """
@@ -27,73 +27,20 @@ index 0d1bea4..c99da5d 100644
 +    return total / len(args)
 """
 
-def install_hooks(repo_path=".", dry_run=False):
-    """Install git hooks for the repository"""
-    try:
-        repo = Repo(repo_path)
-        hook_path = Path(repo.git_dir) / "hooks" / "pre-commit"
-        
-        # Create hook script with TTY handling
-        hook_content = f"""#!/bin/bash
-export PYTHONUNBUFFERED=1
-python {Path(__file__).resolve()} repo pre-commit {f"--dry-run" if dry_run else ""}
-"""
-        
-        # Write and make executable
-        hook_path.write_text(hook_content)
-        hook_path.chmod(0o755)
-        print(f"Installed pre-commit hook to {hook_path}")
-        return 0
-        
-    except Exception as e:
-        print(f"Error installing hooks: {e}")
-        return 1
-
-def delete_hooks(repo_path="."):
-    """Delete git hooks for the repository"""
-    try:
-        repo = Repo(repo_path)
-        hook_path = Path(repo.git_dir) / "hooks" / "pre-commit"
-        
-        if hook_path.exists():
-            hook_path.unlink()
-            print(f"Deleted pre-commit hook at {hook_path}")
-            return 0
-        else:
-            print("No pre-commit hook found")
-            return 0
-            
-    except Exception as e:
-        print(f"Error deleting hooks: {e}")
-        return 1
-
 @click.group()
 def cli():
     """TestBot CLI tool for managing test repositories"""
     pass
 
-@cli.group()
-def repo():
-    """Commands for managing test repositories"""
-    pass
-
-# TODO: tmrw find way to get the paths in sync .. probably have to use absolute paths??
-@repo.command()
-@click.option("--dry-run", is_flag=True, help="For testing if hook installed")
-def pre_commit(dry_run):
-    """Run pre-commit checks on staged changes"""
+@cli.command()
+def staged():
+    """Generate tests for staged changes"""
     repo_path = Path(os.getcwd()).resolve() # git sets CWD when calling pre-commit
-
-    if dry_run:
-        # NOTE: writing to stderr cuz git hooks convention, prolly unbuffered, 
-        # and clears room for scripts that are depending on stdout output to be piped
-        sys.stderr.write("Install success!\n")
-        return "Install success!"
 
     io = IO()
     if not io.input("Proceed with TestBot test generation [y/N]: ", 
                validator=lambda x: x.lower() == "y"):
-        sys.stderr.write("Proceeding with normal git commit process\n")
+        print("Proceeding with normal git commit process\n")
         sys.exit(0)
 
     store = JsonStore()
@@ -101,24 +48,26 @@ def pre_commit(dry_run):
         repo = Repo(repo_path)
         patch = repo.git.diff('HEAD', cached=True)  # 'cached' means staged changes
         if not patch:
-            sys.stderr.write("No staged changes found\n")
+            print("No staged changes found\n")
             sys.exit(0)
         
         commit = CommitDiff(
             patch=patch,
             timestamp=datetime.now().isoformat()
         )
-        sys.stderr.write(f"Changed files: {commit.src_files}\n")
+        print(f"Changed files: {commit.src_files}\n")
 
-        workflow = TestDiffWorkflow(commit, repo_path, LLMModel(), store)
+        workflow = TestDiffWorkflow(commit, repo_path, LLMModel(), store, io)
         workflow.run()
+
+        sys.exit(1)
     except Exception as e:
         import traceback
-        sys.stderr.write(f"Error in pre-commit check: {e}\n")
-        sys.stderr.write(f"Stacktrace:\n{traceback.format_exc()}\n")
+        print(f"Error in pre-commit check: {e}\n")
+        print(f"Stacktrace:\n{traceback.format_exc()}\n")
         sys.exit(1)
 
-@repo.command()
+@cli.command()
 def test_pre_commit():
     """Run pre-commit checks on staged changes"""
     from testbot.utils import get_staged_files
@@ -132,7 +81,7 @@ def test_pre_commit():
             patch=TEST_PATCH,
             timestamp=datetime.now().isoformat()
         )
-        sys.stderr.write(f"Changed files: {commit.src_files}\n")
+        print(f"Changed files: {commit.src_files}\n")
         workflow = TestDiffWorkflow(commit, 
                                     Path("tests/test_repos/test_repo"),
                                     LLMModel(), 
@@ -143,11 +92,11 @@ def test_pre_commit():
 
     except Exception as e:
         import traceback
-        sys.stderr.write(f"Error in pre-commit check: {e}\n")
-        sys.stderr.write(f"Stacktrace:\n{traceback.format_exc()}\n")
+        print(f"Error in pre-commit check: {e}\n")
+        print(f"Stacktrace:\n{traceback.format_exc()}\n")
         sys.exit(1)
 
-@repo.command()
+@cli.command()
 @click.argument("repo_path")
 @click.option("--language", default=None)
 @click.option("--limit", type=int, default=None, help="Limit the number of test files to map back to source")
@@ -164,7 +113,6 @@ def init(repo_path, language, limit):
 
     workflow = InitRepo(Path(repo_path), LLMModel(), store, language=language, limit=limit)
     workflow.run()
-    install_hooks(repo_path=repo_path)
 
 # @repo.command()
 # def delete():

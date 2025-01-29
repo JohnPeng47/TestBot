@@ -361,6 +361,13 @@ VALID EDIT_OPS:
    </modify_op>
 
 NOTE: All operations must be enclosed in <edit_op> tags
+NOTE: Make sure to observer proper new lines
+
+NEWLINE EXAMPLES:
+    return something
+def do_stuff(**args): # BAD: should add a newline in between
+    ...
+
 
 EXAMPLES:
 

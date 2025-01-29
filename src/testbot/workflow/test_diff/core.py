@@ -1,7 +1,7 @@
 from testbot.llm import LLMModel
 from testbot.diff import CommitDiff
 from testbot.store.store import TestBotStore
-from testbot.utils import create_and_stage_test_diff, git_commit
+from testbot.terminal import IO
 from testbot.utils import hook_print
 
 from .lmp import (
@@ -12,6 +12,7 @@ from .lmp import (
 )
 from ..base import WorkFlow
 
+import difflib
 from pathlib import Path
 
 class TestDiffWorkflow(WorkFlow):
@@ -20,9 +21,11 @@ class TestDiffWorkflow(WorkFlow):
                  commit: CommitDiff,
                  repo_path: Path, 
                  lm: LLMModel,
-                 store: TestBotStore):
+                 store: TestBotStore,
+                 io: IO):
         super().__init__(lm, store)
         
+        self._io = io
         self._repo_path = repo_path
         self._commit = commit
 
@@ -77,7 +80,6 @@ class TestDiffWorkflow(WorkFlow):
 
         hook_print(f"[SRC_TEST]: {filtered_src_and_test}")
         
-        # TODO: do this in parallel
         for src_file, test_files in filtered_src_and_test:
             # TODO: handle filtering files with another prompt
             test_file = test_files[0]
@@ -94,4 +96,18 @@ class TestDiffWorkflow(WorkFlow):
             )
             print("[NEW TEST]: ", new_test)
 
-            create_and_stage_test_diff(self._repo_path, test_file, new_test)
+            # TODO: add color here
+            diff = difflib.unified_diff(
+                existing_tests.splitlines(keepends=True),
+                new_test.splitlines(keepends=True),
+                fromfile="existing_tests",
+                tofile="new_tests"
+            )
+            diff = "".join(diff)
+            if self._io.input(f"{diff}\nWrite changes to {test_file} (y/n)", 
+                              validator=lambda res: res.lower() == "y"):
+                with open(test_file, "w") as f:
+                    f.write(new_test)
+                
+            # create_and_stage_test_diff(self._repo_path, test_file, new_test)
+            
