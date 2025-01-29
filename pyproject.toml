@@ -1,16 +1,16 @@
 [tool.poetry]
-name = "cowboy"
+name = "testbot"
 version = "0.1.0"
 description = ""
 authors = ["John Peng"]
 readme = "README.md"
 
 packages = [
-    { include = "cowboy", from = "src" }
+    { include = "testbot", from = "src" }
 ]
 
 [tool.poetry.scripts]
-cowboy = "cowboy.cli:main"
+testbot = "testbot.cli:main"
 
 [tool.poetry.dependencies]
 python = "^3.12"
@@ -22,6 +22,7 @@ litellm = "^1.59.3"
 pydantic = "^2.10.5"
 gitpython = "^3.1.44"
 braintrust = "^0.0.183"
+colorama = "^0.4.6"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.4"
