@@ -18,7 +18,7 @@ from litellm import completion
 from litellm.types.utils import ModelResponse
 from pydantic import BaseModel
 
-from testbot.utils import green_text
+from testbot.utils import green_text, hook_print
 
 client = instructor.from_litellm(completion)
 
@@ -254,16 +254,22 @@ class LLMModel:
             **kwargs
         )
         return res
-
+    
     def __del__(self):
         """Cleanup database connections on object destruction."""
+        # import traceback
+        # print("Cleaning up database connection. Called from:")
+        # traceback.print_stack()
+
         if self.db_connection:
             self.db_connection.close()
 
 
+# DESIGN: not sure how to enforce this but we should only allow JSON serializable
+# args to be passed to the model, to be compatible with Braintrust 
 class LMP[T]:
     """
-    A language model program
+    A language model progsram
     """
     prompt: str
     response_format: Type[T]
@@ -448,7 +454,6 @@ Now generate your code:"""
         # Parse XML while preserving whitespace
         parser = ET.XMLParser()
         root = ET.fromstring(xml_content, parser=parser)
-        
         edit_ops = []
         
         # Process all append operations
@@ -496,6 +501,8 @@ Now generate your code:"""
         return edit_ops
 
     def _process_result(self, res: str, **prompt_args) -> str:
+        hook_print("[RESULT]: ", res)
+
         edit_ops = self._extract_edit_ops(res)
         target_code = self._target_code
         for op in edit_ops:

@@ -68,4 +68,7 @@ run
 tests/test_repos
 log/*
 src/eval/datasets/*
-src/eval/output/*
+src/eval/output/*ss
+
+tests.json
+repos.json

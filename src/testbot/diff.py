@@ -242,6 +242,9 @@ class CommitDiff:
         if not patch:
             raise DiffsNotFoundException("Empty patch file argument")
         try:
+            if patch.endswith('\ No newline at end of file'):
+                patch = patch.rsplit('\n', 1)[0]
+
             self.diffs: List[Diff] = self._segment_diffs(patch)
             self.files: List[Diff] = [d.filepath for d in self.diffs]
             self.hunks = [hunk for d in self.diffs for hunk in d.hunks]

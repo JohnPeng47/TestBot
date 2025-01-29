@@ -1,10 +1,7 @@
 import os
 import sys
 import termios
-import tty
 from typing import Optional, Any, Callable
-from contextlib import contextmanager
-from dataclasses import dataclass
 from enum import Enum
 
 class IOColor(Enum):

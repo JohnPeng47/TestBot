@@ -6,7 +6,7 @@ class Modules(BaseModel):
     reasoning: str
     is_single_module: bool
     module_names: List[str]
-
+    
 # NOTE: to modify prompt to handle other notations we can ask return in python dotted notation
 # to standardize module parsing
 class IdentifyModules(LMP):

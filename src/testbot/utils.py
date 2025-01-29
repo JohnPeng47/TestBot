@@ -4,16 +4,17 @@ import string
 import uuid
 import time
 import functools
-import configparser
 from pathlib import Path
 from colorama import Fore, Style
 from pathlib import Path
-from typing import List, Set
 import os
+import tempfile
+import git
+import subprocess
+import sys
 
 # support for all strings as multi-line
 import yaml
-
 
 DELIMETER = "================================================================================"
 
@@ -25,6 +26,10 @@ def str_presenter(dumper, data):
 
 yaml.add_representer(str, str_presenter)
 
+def hook_print(*args):
+    """Print to stderr for git hooks."""
+    s = " ".join(map(str, args)) + "\n"
+    sys.stderr.write(s)
 
 # nested level get() function
 def resolve_attr(obj, attr, default=None):
@@ -119,3 +124,72 @@ def load_env(env_path: str = ".env") -> None:
                     os.environ[key.strip()] = value.strip().strip("\"'")
     except FileNotFoundError:
         print(f"Warning: {env_path} file not found")
+
+def create_and_stage_test_diff(repo_path: Path, test_file: str, new_test_content: str) -> bool:
+    """
+    Creates a diff between the existing test file and new test content,
+    then stages it in the current git commit.
+    
+    Args:
+        test_file: Path to the existing test file
+        new_test_content: New test content as string
+        
+    Returns:
+        bool: True if diff was created and staged successfully
+    """
+    test_path = Path(test_file)
+            
+    diff_file = tempfile.NamedTemporaryFile(mode="w", suffix=".diff", delete=False)
+    diff_path = Path(diff_file.name)
+    diff_file.close()
+
+    # Read original content first
+    with open(test_path, "r") as f:
+        old_content = f.read()
+    
+    try:            
+        # Create git repo object
+        repo = git.Repo(repo_path)
+        
+        # Write new content to file
+        with open(test_path, "w") as f:
+            f.write(new_test_content)
+
+        # Get the diff between working tree and index with explicit flags
+        diff = str(repo.git.diff("--unified", test_path.relative_to(repo_path)))
+        with open(diff_path, "w") as f:
+            f.write(diff + "\n")
+
+        # Write back old content
+        with open(test_path, "w") as f:
+            f.write(old_content)
+
+        # Apply the diff and stage changes
+        try:
+            repo.git.apply("--cached", str(diff_path))
+            return True
+            
+        except subprocess.CalledProcessError as e:
+            print(f"Error applying diff: {e.stderr}")
+            return False
+            
+    finally:
+        # Ensure original content is restored even if something fails
+        with open(test_path, "w") as f:
+            f.write(old_content)
+        os.unlink(diff_path)
+
+def git_commit(repo_path: Path, message: str) -> bool:
+    """Commit changes in the git repo with the given message."""
+    repo = git.Repo(repo_path)
+    try:
+        repo.git.commit("-m", message)
+        return True
+    except git.GitCommandError as e:
+        print(f"Error committing changes: {e.stderr}")
+        return False
+
+def get_staged_files(repo_path = "."):
+    """Get the list of staged files in the current git repo."""
+    repo = git.Repo(repo_path)
+    return repo.git.diff("--cached", "--name-only").splitlines()

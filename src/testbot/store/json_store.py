@@ -3,7 +3,10 @@ from pathlib import Path
 from typing import Optional, Any, List
 
 from testbot.config import STORE_PATH
+from testbot.utils import hook_print
+
 from .store import TestBotStore
+from .exceptions import StoreDoesNotExist
 from ..models.core import RepoConfig, TestFileData
 
 class JsonStore(TestBotStore):
@@ -13,8 +16,10 @@ class JsonStore(TestBotStore):
         self.store_path = store_path
         self.repos_file = store_path / "repos.json"
         self.tests_file = store_path / "tests.json"
+
+        hook_print(f"[Store path]: {self.tests_file}")
+        hook_print(f"[Repos file]: {self.repos_file}")
         
-        # Create store files if they don't exist
         self.store_path.mkdir(parents=True, exist_ok=True)
         if not self.repos_file.exists():
             self._write_json(self.repos_file, {})
@@ -35,6 +40,7 @@ class JsonStore(TestBotStore):
         repos = self._read_json(self.repos_file)
         if repo_name not in repos:
             raise KeyError(f"Repository {repo_name} not found")
+
         del repos[repo_name]
         self._write_json(self.repos_file, repos)
 

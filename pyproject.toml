@@ -21,6 +21,7 @@ instructor = "^1.7.2"
 litellm = "^1.59.3"
 pydantic = "^2.10.5"
 gitpython = "^3.1.44"
+braintrust = "^0.0.183"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.4"

@@ -97,12 +97,10 @@ class InitRepo(WorkFlow):
                     test_file = test_content
                 )
 
+                # BUG: this loop adds files sys modules and resolves them to self._repo_path
                 for module in modules.module_names:
                     rel_mod_path = Path(*module.split("."))
                     mod_path = root_path / (str(rel_mod_path) + EXTENSIONS[lang])
-
-                    # print("Module path: ", mod_path)
-                    # print("Module: ", module)
 
                     if not mod_path.exists():
                         # use matching filename to find the actual root pat
@@ -112,24 +110,23 @@ class InitRepo(WorkFlow):
 
                             # print("New root path: ", root_path)
                             # print("New module path: ", mod_path)
-
-                            # Idk ....
                             if not mod_path.exists():
                                 raise Exception()
 
                     print("> found covered src file: ", mod_path)
 
-                    src_test_mapping[str(mod_path)].append(str(f))
-                    target_files.append(str(mod_path))
+                    src_test_mapping[str(mod_path.resolve())].append(str(f))
+                    target_files.append(mod_path)
 
                 if target_files:
+                    print("Saving testfilepath: ", str(f.resolve()))
+                    print("Saving targeted files: ", [str(tf.resolve()) for tf in target_files])
                     self._store.update_or_create_testfile_data(
                         TestFileData(
                             id=str(f),
                             name=f.name,
-                            filepath=str(f),
-                            targeted_files=target_files,
-                            # test_metadata={"type": "unit"}
+                            filepath=str(f.resolve()),
+                            targeted_files=[str(tf.resolve()) for tf in target_files],
                         )
                     )
             processed_files += 1

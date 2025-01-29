@@ -3,6 +3,7 @@ from testbot.llm import (
     CodeEdit, 
     LLMVerificationError
 )
+from testbot.utils import hook_print
 
 from pathlib import Path
 import jinja2
@@ -27,9 +28,6 @@ class FilteredSrcFiles(BaseModel):
     reason: str
     file_and_op: List[Tuple[str, RecommendedOp]]
 
-# NOTE: ideally we can get *block level* src -> test mappings so we can better fit into prompt
-# instead of jamming all test case
-# NOTE: tmrw should try thinking prompt and compare evaluation scores
 class FilterCommitFilesBatchedV1(LMP):
     """Filter out all changed files in single commit"""
 
@@ -66,6 +64,7 @@ Return your output with the stated reason as well as a list of (file, RECOMMENDE
             src_and_test_str += f"\n{test_content}\n"
             
         prompt = jinja2.Template(self.prompt).render(patch=patch, src_and_test=src_and_test_str)
+        hook_print("[FILTERPROMPT]: ", prompt)
 
         return prompt
             

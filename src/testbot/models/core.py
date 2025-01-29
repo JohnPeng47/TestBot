@@ -34,7 +34,6 @@ class RepoConfig(SQLModel, table=True):
     def __init__(self, **data):
         super().__init__(**data)
         self.url = self.validate_url(self.url)
-
         self.validate_paths()
 
     def validate_paths(self):
