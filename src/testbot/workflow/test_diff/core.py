@@ -2,13 +2,15 @@ from testbot.llm import LLMModel
 from testbot.diff import CommitDiff
 from testbot.store.store import TestBotStore
 from testbot.terminal import IO
-from testbot.utils import hook_print
+
+from testbot.logger import logger as log
 
 from .lmp import (
     FilterCommitFilesBatchedV1, 
     RecommendedOp, 
     FilteredSrcFiles,
     GenerateTestWithExisting,
+    CleanUpCode
 )
 from ..base import WorkFlow
 
@@ -35,22 +37,19 @@ class TestDiffWorkflow(WorkFlow):
     # IMPROVE(V4): handle case of unmapped new file
     # where the test file is also included with the commit
     def run(self):
+        log.info(f"Starting TestDiffWorkflow for {self._repo_path}")
+
         src_and_test = []
         for src_file in self._commit.code_files:
             src_file = self._repo_path / src_file
             src_file = str(src_file.resolve())
-
-            hook_print(f"[CHANGED SRCFILE]: {src_file}\n")
-
             test_files = self._store.get_testfiles_from_srcfile(src_file)
             test_files = [f.filepath for f in test_files]
             
             # TODO: handle case of multiple test files
-            hook_print(src_file, test_files)
+            log.debug(f"[MAPPED TESTFILES]: {test_files}")
             test_file = test_files[0]
             test_content = open(test_file, "r").read()
-            
-            hook_print()
             src_and_test.append((src_file, (test_file, test_content)))
     
         # first try to filter out useless files
@@ -69,7 +68,7 @@ class TestDiffWorkflow(WorkFlow):
             # actually have a problem here if repo_path is fullpath
             src_file = self._repo_path / src_file
             src_file = src_file.resolve()
-            hook_print(f"[CHANGED SRCFILE]: {src_file}, {op}\n")
+            log.info(f"[CHANGED SRCFILE]: {src_file}, {op}\n")
 
             if op == RecommendedOp.NO_ACTION:
                 continue
@@ -77,8 +76,6 @@ class TestDiffWorkflow(WorkFlow):
                 test_files = self._store.get_testfiles_from_srcfile(src_file)
                 test_files = [f.filepath for f in test_files]
                 filtered_src_and_test.append((src_file, test_files))
-
-        hook_print(f"[SRC_TEST]: {filtered_src_and_test}")
         
         for src_file, test_files in filtered_src_and_test:
             # TODO: handle filtering files with another prompt
@@ -94,7 +91,6 @@ class TestDiffWorkflow(WorkFlow):
                 source_file = src_file.name,
                 existing_tests = existing_tests
             )
-            print("[NEW TEST]: ", new_test)
 
             # TODO: add color here
             diff = difflib.unified_diff(
@@ -106,8 +102,16 @@ class TestDiffWorkflow(WorkFlow):
             diff = "".join(diff)
             if self._io.input(f"{diff}\nWrite changes to {test_file} (y/n)", 
                               validator=lambda res: res.lower() == "y"):
+                cleaned_test = CleanUpCode().invoke(
+                    self._lm,
+                    model_name = "deepseek",
+                    code = new_test
+                )
+                cleaned_test = cleaned_test.code
+                log.info(f"[NEW TEST]:\n{cleaned_test}")
+
                 with open(test_file, "w") as f:
-                    f.write(new_test)
+                    f.write(cleaned_test)
                 
             # create_and_stage_test_diff(self._repo_path, test_file, new_test)
             

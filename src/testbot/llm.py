@@ -18,7 +18,7 @@ from litellm import completion
 from litellm.types.utils import ModelResponse
 from pydantic import BaseModel
 
-from testbot.utils import green_text, hook_print
+from testbot.utils import green_text
 
 client = instructor.from_litellm(completion)
 
@@ -508,8 +508,6 @@ Now generate your code:"""
         return edit_ops
 
     def _process_result(self, res: str, **prompt_args) -> str:
-        hook_print("[RESULT]: ", res)
-
         edit_ops = self._extract_edit_ops(res)
         target_code = self._target_code
         for op in edit_ops:

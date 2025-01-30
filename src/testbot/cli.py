@@ -6,7 +6,7 @@ import sys
 import os
 
 from testbot.terminal import IO
-from testbot.store import JsonStore, StoreDoesNotExist
+from testbot.store import JsonStore
 from testbot.workflow import InitRepo, TestDiffWorkflow
 from testbot.llm import LLMModel
 from testbot.utils import load_env
@@ -28,9 +28,15 @@ index 0d1bea4..c99da5d 100644
 """
 
 @click.group()
-def cli():
+@click.option("--debug", is_flag=True, help="Enable debug mode")
+def cli(debug):
     """TestBot CLI tool for managing test repositories"""
-    pass
+    load_env()
+    print(debug)
+
+    import sys
+    sys.exit(0)
+
 
 @cli.command()
 def staged():
@@ -68,35 +74,6 @@ def staged():
         sys.exit(1)
 
 @cli.command()
-def test_pre_commit():
-    """Run pre-commit checks on staged changes"""
-    from testbot.utils import get_staged_files
-    print("STAGED FILES BEFORE: ", get_staged_files("tests/test_repos/test_repo"))
-
-    ask_user_approval()
-
-    store = JsonStore()
-    try:
-        commit = CommitDiff(
-            patch=TEST_PATCH,
-            timestamp=datetime.now().isoformat()
-        )
-        print(f"Changed files: {commit.src_files}\n")
-        workflow = TestDiffWorkflow(commit, 
-                                    Path("tests/test_repos/test_repo"),
-                                    LLMModel(), 
-                                    store)
-        workflow.run()
-        print("STAGED FILES AFTER: ", get_staged_files("tests/test_repos/test_repo"))
-        sys.exit(1)
-
-    except Exception as e:
-        import traceback
-        print(f"Error in pre-commit check: {e}\n")
-        print(f"Stacktrace:\n{traceback.format_exc()}\n")
-        sys.exit(1)
-
-@cli.command()
 @click.argument("repo_path")
 @click.option("--language", default=None)
 @click.option("--limit", type=int, default=None, help="Limit the number of test files to map back to source")
@@ -119,9 +96,7 @@ def init(repo_path, language, limit):
 #     """Delete an existing test repository"""
 #     store = JsonStore()
 
-def main():
-    load_env() # load LLM API keys
-    
+def main():    
     cli()
 
 if __name__ == "__main__":

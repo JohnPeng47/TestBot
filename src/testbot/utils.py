@@ -26,11 +26,6 @@ def str_presenter(dumper, data):
 
 yaml.add_representer(str, str_presenter)
 
-def hook_print(*args):
-    """Print to stderr for git hooks."""
-    s = " ".join(map(str, args)) + "\n"
-    sys.stderr.write(s)
-
 # nested level get() function
 def resolve_attr(obj, attr, default=None):
     """Attempts to access attr via dotted notation, returns none if attr does not exist."""

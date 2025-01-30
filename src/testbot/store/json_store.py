@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Optional, Any, List
 
 from testbot.config import STORE_PATH
-from testbot.utils import hook_print
+from testbot.logger import logger as log
 
 from .store import TestBotStore
 from .exceptions import StoreDoesNotExist
@@ -17,8 +17,8 @@ class JsonStore(TestBotStore):
         self.repos_file = store_path / "repos.json"
         self.tests_file = store_path / "tests.json"
 
-        hook_print(f"[Store path]: {self.tests_file}")
-        hook_print(f"[Repos file]: {self.repos_file}")
+        log.debug(f"[Store path]: {self.tests_file}")
+        log.debug(f"[Repos file]: {self.repos_file}")
         
         self.store_path.mkdir(parents=True, exist_ok=True)
         if not self.repos_file.exists():
