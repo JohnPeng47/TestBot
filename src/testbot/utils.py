@@ -11,7 +11,6 @@ import os
 import tempfile
 import git
 import subprocess
-import sys
 
 # support for all strings as multi-line
 import yaml
@@ -119,6 +118,25 @@ def load_env(env_path: str = ".env") -> None:
                     os.environ[key.strip()] = value.strip().strip("\"'")
     except FileNotFoundError:
         print(f"Warning: {env_path} file not found")
+
+class GitCommitContext:
+    def __init__(self, repo_path, target_commit):
+        self.repo = git.Repo(repo_path)
+        self.target_commit = target_commit
+        self.original_commit = self.repo.head.commit.hexsha
+
+    def __enter__(self):
+        try:
+            print(green_text(f"Resetting to commit {self.target_commit}"))
+            
+            self.repo.commit(self.target_commit)
+            self.repo.git.reset("--hard", self.target_commit)
+            return self.repo
+        except Exception:
+            raise ValueError(f"[GitCommitContext]: Commit {self.target_commit} not found in repository")
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.repo.git.reset("--hard", self.original_commit)
 
 def create_and_stage_test_diff(repo_path: Path, test_file: str, new_test_content: str) -> bool:
     """

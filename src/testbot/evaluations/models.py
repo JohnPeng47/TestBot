@@ -19,6 +19,12 @@ class Commit(SQLModel, table=True):
             repo=self.repo
         )
 
+class RepoEvalConfig(SQLModel, table=True):
+    __table_args__ = {'extend_existing': True}  # Add this line
+
+    repo_name: str
+    sha: str = Field(primary_key=True)
+
 @dataclass
 class EvalData:
     name: str

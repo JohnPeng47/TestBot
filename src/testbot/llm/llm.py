@@ -244,7 +244,7 @@ class LLMModel:
 
     @cache_llm_response
     def invoke(self, 
-            prompt: str | List[ChatMessage],
+               prompt: str | List[ChatMessage],
                *, 
                model_name: str = "gpt-4o", 
                response_format: Optional[Type[BaseModel]] = None,
@@ -273,14 +273,12 @@ class LLMModel:
                 raw_response = convert_instructor_usage(raw_response)
             
             self.cost += completion_cost(raw_response, model=model_name)
-            print(completion_cost(raw_response, model=model_name))
         else:
             res = completion(
                 model=model_name, 
                 messages=messages, 
                 **kwargs)
             self.cost += completion_cost(res, model=model_name)
-            print(completion_cost(res, model=model_name))
 
         return res
     

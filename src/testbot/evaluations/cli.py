@@ -7,13 +7,14 @@ import traceback
 from sqlmodel import Session, create_engine, SQLModel
 from functools import wraps
 
+from testbot.store import JsonStore
 from testbot.diff import CommitDiff
 from testbot.llm.llm import LLMModel, num_tokens_from_string
 from testbot.config import BRAINTRUST_PROJ_NAME
 from testbot.utils import load_env
 
 from .models import Commit
-from .utils import get_db_session
+from .utils import get_db_session_and_store
 from .evals import eval_patch
 
 ## import evals
@@ -42,8 +43,11 @@ def eval_cli(ctx: click.Context, db_path: str):
     
     # Create tables only once at startup
     SQLModel.metadata.create_all(engine)
+
+    store = JsonStore()
     
     ctx.obj["engine"] = engine
+    ctx.obj["store"] = store
 
 # add evaluations as subcommands    
 eval_cli.add_command(eval_patch)
@@ -53,7 +57,7 @@ eval_cli.add_command(eval_patch)
 @click.pass_context
 def build_commits(ctx: click.Context, repo_path: str):
     """Download commits for a repository"""
-    with get_db_session(ctx) as session:
+    with get_db_session_and_store(ctx) as (session, _):
         repo_path = Path(repo_path)
         repo = git.Repo(repo_path)
         commits = list(repo.iter_commits())
@@ -124,7 +128,7 @@ def build_commits(ctx: click.Context, repo_path: str):
 @click.pass_context
 def list_commits(ctx, repo, num_files, num_test_files, sha, diff_bytes):
     """List commits matching the given filters"""
-    with get_db_session(ctx) as session:
+    with get_db_session_and_store(ctx) as (session, _):
         filters = {}
         if repo:
             filters["repo"] = repo

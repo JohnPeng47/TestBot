@@ -41,12 +41,14 @@ class InitRepo(WorkFlow):
                  lm: LLMModel,
                  store: TestBotStore,
                  language: str = "",
+                 sha: str = None,
                  limit: int = None):
         super().__init__(lm, store)
 
         self._repo_path = repo_path
         self._language = language
         self._limit = limit
+        self._sha = sha
 
     def _create_repo_config(self) -> RepoConfig:
         """Create and save a repository configuration"""
@@ -61,7 +63,8 @@ class InitRepo(WorkFlow):
             repo_name=repo_name,
             url=remote_url,
             source_folder=str(self._repo_path.resolve()),
-            language=self._language
+            language=self._language,
+            sha=self._sha
         )
 
         self._store.create_repoconfig(config)

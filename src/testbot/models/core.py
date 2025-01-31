@@ -32,6 +32,7 @@ class RepoConfig(SQLModel, table=True):
     url: str
     source_folder: str
     language: Optional[str] = None
+    sha: Optional[str] = None
 
     def __init__(self, **data):
         super().__init__(**data)
