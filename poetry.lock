@@ -848,7 +848,7 @@ optional = false
 python-versions = "<4.0,>=3.9"
 groups = ["main"]
 files = []
-develop = true
+develop = false
 
 [package.dependencies]
 aiohttp = ">=3.9.1,<4.0.0"
@@ -875,8 +875,10 @@ vertexai = ["google-cloud-aiplatform (>=1.53.0,<2.0.0)", "jsonref (>=1.1.0,<2.0.
 writer = ["writer-sdk (>=1.2.0,<2.0.0)"]
 
 [package.source]
-type = "directory"
-url = "../instructor"
+type = "git"
+url = "https://github.com/JohnPeng47/instructor.git"
+reference = "HEAD"
+resolved_reference = "d41dfbfe50b162511c1cc4a6ea9989a0bd6fa986"
 
 [[package]]
 name = "jinja2"
@@ -2487,4 +2489,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.12"
-content-hash = "fe6205eb0eaa0116de609deee68e82e4d587841dc6994147494df3c1140e3655"
+content-hash = "a669a90c5a29cc046adab6b0ca3a10af908599fe17110b68305db36e1b68ed4c"

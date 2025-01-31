@@ -13,6 +13,7 @@ from testbot.workflow import InitRepo, TestDiffWorkflow
 from testbot.llm.llm import LLMModel
 from testbot.utils import load_env
 from testbot.diff import CommitDiff
+from testbot.evaluations.cli import eval_cli
 
 TEST_PATCH = """
 diff --git a/a.py b/a.py
@@ -38,6 +39,8 @@ def cli(debug):
     log_level = INFO if not debug else DEBUG
     set_log_level(log_level)
 
+# register subcommands
+cli.add_command(eval_cli, name="eval")
 
 @cli.command()
 def staged():
@@ -80,8 +83,6 @@ def staged():
 @click.option("--limit", type=int, default=None, help="Limit the number of test files to map back to source")
 def init(repo_path, language, limit):
     """Initialize a new test repository"""
-
-    print("Hello?")
     model = LLMModel()
     store = JsonStore()
     repo_path = Path(repo_path)

@@ -69,6 +69,7 @@ class HunkChunk:
 
         return None, None, None, None
 
+    # TODO: need to replace this with language specific
     def _new_func_decl(self) -> str:
         """
         If the hunk declares a new test function, return it
@@ -108,6 +109,10 @@ class Diff:
         # for new/renamed files
         # remove b/ from begining
         self.filepath: str = self._find_new_filepath()
+
+    def creates_new_file(self) -> bool:
+        attr = self.attrs if isinstance(self.attrs, DiffAttr) else self.attrs[0]
+        return attr.mode == DiffMode.NEW
 
     def _find_new_filepath(self) -> str:
         """

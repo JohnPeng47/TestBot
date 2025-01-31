@@ -23,7 +23,7 @@ gitpython = "^3.1.44"
 braintrust = "^0.0.183"
 colorama = "^0.4.6"
 pytz = "^2024.2"
-instructor = {path = "../instructor", develop = true}
+instructor = {git = "https://github.com/JohnPeng47/instructor.git"}
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.4"

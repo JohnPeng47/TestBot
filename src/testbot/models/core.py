@@ -4,6 +4,7 @@ from typing import Optional, List
 
 class TestFileData(SQLModel, table=True):
     """Stores information about a test module"""
+    __table_args__ = {'extend_existing': True}  # Add this line
     __tablename__ = "test_modules"
 
     id: str = Field(default=None, primary_key=True)
@@ -23,6 +24,7 @@ class TestFileData(SQLModel, table=True):
 
 class RepoConfig(SQLModel, table=True):
     """Configuration for a GitHub repository"""
+    __table_args__ = {'extend_existing': True}  # Add this line
     __tablename__ = "repo_configs"
 
     id: str = Field(default=None, primary_key=True)
