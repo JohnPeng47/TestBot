@@ -1,4 +1,4 @@
-from testbot.llm import LLMModel
+from testbot.llm.llm import LLMModel
 from testbot.models import RepoConfig, TestFileData
 from testbot.store import TestBotStore
 from testbot.code import SupportedLangs, EXTENSIONS, TEST_PATTERNS
@@ -12,10 +12,11 @@ from .lmp import IdentifyModules, Modules
 from ..base import WorkFlow
 
 EXCLUDE_PATTERNS = [
-    ".venv/*",
-    ".env/*",
-    ".build/*",
-    ".dist/*"
+    "**/.venv/**",
+    "**/venv/**",
+    "**/.env/**",
+    "**/.build/**",
+    "**/.dist/**"
 ]
 
 class LanguageNotSupported(Exception):
@@ -95,6 +96,7 @@ class InitRepo(WorkFlow):
         for f in self._repo_path.rglob(f"*"):
             if any(fnmatch.fnmatch(f, p) for p in EXCLUDE_PATTERNS):
                 continue
+
             if any(f.match(p) for p in TEST_PATTERNS[lang]):
                 target_files = []
 

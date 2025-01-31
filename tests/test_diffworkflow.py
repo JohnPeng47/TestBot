@@ -3,7 +3,7 @@ from git import Repo
 
 from conftest import TEST_REPO, GitCommitContext, normalize_strings
 from testbot.workflow.test_diff.core import TestDiffWorkflow
-from testbot.llm import LLMModel
+from testbot.llm.llm import LLMModel
 from testbot.store import TestBotStore
 from testbot.code import SupportedLangs
 from testbot.diff import CommitDiff

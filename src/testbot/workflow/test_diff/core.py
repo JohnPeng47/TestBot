@@ -1,4 +1,4 @@
-from testbot.llm import LLMModel
+from testbot.llm.llm import LLMModel
 from testbot.diff import CommitDiff
 from testbot.store.store import TestBotStore
 from testbot.terminal import IO

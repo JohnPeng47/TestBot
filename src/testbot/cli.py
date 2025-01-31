@@ -4,11 +4,13 @@ from git import Repo
 from datetime import datetime
 import sys
 import os
+from logging import INFO, DEBUG
 
+from testbot.logger import set_log_level
 from testbot.terminal import IO
 from testbot.store import JsonStore
 from testbot.workflow import InitRepo, TestDiffWorkflow
-from testbot.llm import LLMModel
+from testbot.llm.llm import LLMModel
 from testbot.utils import load_env
 from testbot.diff import CommitDiff
 
@@ -32,10 +34,10 @@ index 0d1bea4..c99da5d 100644
 def cli(debug):
     """TestBot CLI tool for managing test repositories"""
     load_env()
-    print(debug)
 
-    import sys
-    sys.exit(0)
+    log_level = INFO if not debug else DEBUG
+    set_log_level(log_level)
+
 
 @cli.command()
 def staged():
@@ -79,6 +81,8 @@ def staged():
 def init(repo_path, language, limit):
     """Initialize a new test repository"""
 
+    print("Hello?")
+    model = LLMModel()
     store = JsonStore()
     repo_path = Path(repo_path)
     repo = store.get_repoconfig(
@@ -87,8 +91,10 @@ def init(repo_path, language, limit):
     if repo:
         store.delete_repoconfig(repo.repo_name)
 
-    workflow = InitRepo(Path(repo_path), LLMModel(), store, language=language, limit=limit)
+    workflow = InitRepo(Path(repo_path), model, store, language=language, limit=limit)
     workflow.run()
+    
+    print("Initialization cost: ", model.get_cost())
 
 def main():
     cli()

@@ -1,6 +1,6 @@
 from testbot.workflow.init.core import InitRepo
 from testbot.models import RepoConfig
-from testbot.llm import LLMModel
+from testbot.llm.llm import LLMModel
 from testbot.store import TestBotStore
 
 from conftest import TEST_REPO, GitCommitContext

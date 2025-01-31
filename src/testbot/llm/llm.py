@@ -14,11 +14,13 @@ from pydantic import BaseModel
 import tiktoken
 
 import instructor
-from litellm import completion
+from litellm import completion, completion_cost
 from litellm.types.utils import ModelResponse
 from pydantic import BaseModel
 
 from testbot.utils import green_text
+
+from .utils import convert_instructor_usage
 
 client = instructor.from_litellm(completion)
 
@@ -40,7 +42,7 @@ class LLMVerificationError(Exception):
 class ChatMessage(BaseModel):
     role: str
     content: str
-
+    
 class LLMModel:
     """
     LLMModel that wraps LiteLLM and Instructor for structured output
@@ -61,6 +63,7 @@ class LLMModel:
         """
         self.use_cache = use_cache
         self.config = self._read_config(configpath)
+        self.cost = 0
 
         # Initialize cache-related attributes
         self.cache_enabled_functions = self._get_cache_enabled_functions()
@@ -73,6 +76,9 @@ class LLMModel:
         
         # Add call chain tracking
         self.call_chain = []
+
+    def get_cost(self) -> float:
+        return self.cost
 
     def _read_config(self, fp: Path):
         # with open(fp, "r") as f:
@@ -216,6 +222,11 @@ class LLMModel:
                 cached_response = res
             elif isinstance(res, BaseModel):
                 cached_response = res.model_dump()
+            elif isinstance(res, Tuple):
+                if isinstance(res[0], BaseModel):
+                    cached_response = res[0].model_dump()
+                else:
+                    raise Exception(f"Unsupported return type: {type(res)}")
             else:
                 raise Exception(f"Unsupported return type: {type(res)}")
                 
@@ -228,9 +239,12 @@ class LLMModel:
             
         return wrapper
 
+    def _update_llm_stats(self, usage):
+        pass
+
     @cache_llm_response
     def invoke(self, 
-               prompt: str | List[ChatMessage],
+            prompt: str | List[ChatMessage],
                *, 
                model_name: str = "gpt-4o", 
                response_format: Optional[Type[BaseModel]] = None,
@@ -247,12 +261,27 @@ class LLMModel:
             messages = [m.dict() for m in prompt]
             
         model_name = SHORT_NAMES[model_name]
-        res = client.chat.completions.create(
-            model=model_name,
-            messages=messages,
-            response_model=response_format,
-            **kwargs
-        )
+        if response_format:
+            res, raw_response = client.chat.completions.create_with_completion(
+                model=model_name,
+                messages=messages,
+                response_model=response_format,
+                **kwargs
+            )
+            # Need to do this for openai models. Some instructor/liteLLM issue
+            if model_name == "gpt-4o":
+                raw_response = convert_instructor_usage(raw_response)
+            
+            self.cost += completion_cost(raw_response, model=model_name)
+            print(completion_cost(raw_response, model=model_name))
+        else:
+            res = completion(
+                model=model_name, 
+                messages=messages, 
+                **kwargs)
+            self.cost += completion_cost(res, model=model_name)
+            print(completion_cost(res, model=model_name))
+
         return res
     
     def __del__(self):

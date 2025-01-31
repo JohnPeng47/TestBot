@@ -1,4 +1,4 @@
-from testbot.llm import LLMModel, LMP
+from testbot.llm.llm import LLMModel, LMP
 from pydantic import BaseModel
 from typing import List
 

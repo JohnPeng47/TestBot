@@ -1,4 +1,4 @@
-from testbot.llm import (
+from testbot.llm.llm import (
     LMP, 
     CodeEdit, 
     LLMVerificationError

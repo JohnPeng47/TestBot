@@ -1,5 +1,5 @@
 from testbot.code import SupportedLangs
-from testbot.llm import LLMModel
+from testbot.llm.llm import LLMModel
 from testbot.store.store import TestBotStore
 
 from pathlib import Path

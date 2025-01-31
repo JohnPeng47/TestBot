@@ -2,7 +2,7 @@ from typing import NewType
 import git
 
 from testbot.diff import CommitDiff
-from testbot.llm import num_tokens_from_string
+from testbot.llm.llm import num_tokens_from_string
 
 SHA = NewType("SHA", str)
 

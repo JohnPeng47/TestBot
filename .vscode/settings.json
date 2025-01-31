@@ -1,0 +1,5 @@
+{
+    "files.exclude": {
+        "src/testboy/eval_repos/**": true
+    }
+}

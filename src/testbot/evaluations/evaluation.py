@@ -8,7 +8,7 @@ from sqlmodel import Session, create_engine, SQLModel
 from functools import wraps
 
 from testbot.diff import CommitDiff
-from testbot.llm import LLMModel, num_tokens_from_string
+from testbot.llm.llm import LLMModel, num_tokens_from_string
 from testbot.config import BRAINTRUST_PROJ_NAME
 from testbot.utils import load_env
 
@@ -208,12 +208,19 @@ def list_commits(repo, num_files, num_test_files, sha, diff_bytes, session: Sess
         return
         
     for commit in commits:
+        # filter only 1-1, test/src
+        # and includes new test definition
+        # we can look for 
+        
+
+
         click.echo(commit.diff)
         # click.echo(f"SHA: {commit.sha}")
         # click.echo(f"Repo: {commit.repo}")
         # click.echo(f"Files: {commit.num_files}")
         # click.echo(f"Test Files: {commit.num_test_files}")
         click.echo("-------------------------------")
+
 if __name__ == "__main__":
     
     eval_cli()

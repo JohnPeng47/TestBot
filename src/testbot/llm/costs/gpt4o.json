@@ -1,0 +1,17 @@
+{
+    "max_tokens": 16384,
+    "max_input_tokens": 128000,
+    "max_output_tokens": 16384,
+    "input_cost_per_token": 0.0000025,
+    "output_cost_per_token": 0.00001,
+    "input_cost_per_token_batches": 0.00000125,
+    "output_cost_per_token_batches": 0.000005,
+    "cache_read_input_token_cost": 0.00000125,
+    "supports_function_calling": true,
+    "supports_parallel_function_calling": true,
+    "supports_response_schema": true,
+    "supports_vision": true,
+    "supports_prompt_caching": true,
+    "supports_system_messages": true
+  }
+  
