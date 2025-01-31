@@ -37,7 +37,6 @@ def cli(debug):
     import sys
     sys.exit(0)
 
-
 @cli.command()
 def staged():
     """Generate tests for staged changes"""
@@ -91,12 +90,7 @@ def init(repo_path, language, limit):
     workflow = InitRepo(Path(repo_path), LLMModel(), store, language=language, limit=limit)
     workflow.run()
 
-# @repo.command()
-# def delete():
-#     """Delete an existing test repository"""
-#     store = JsonStore()
-
-def main():    
+def main():
     cli()
 
 if __name__ == "__main__":

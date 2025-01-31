@@ -255,6 +255,9 @@ class CommitDiff:
 
     def code_diffs(self):
         return [diff for diff in self.diffs if self.is_code_file(diff.filepath)]
+    
+    def test_diffs(self):
+        return [diff for diff in self.diffs if self.is_test_file(diff.filepath)]
 
     def is_code_file(self, filename: str):
         return "test" not in filename and filename.endswith(".py")
