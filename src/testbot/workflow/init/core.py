@@ -101,37 +101,15 @@ class InitRepo(WorkFlow):
                 continue
 
             if any(f.match(p) for p in TEST_PATTERNS[lang]):
-                target_files = []
-
                 print(f"[*] Resolving target source for {str(f)}")
 
                 test_content = open(f, "r").read()
-                modules = IdentifyModules().invoke(
+                target_files = IdentifyModules().invoke(
                     self._lm,
                     model_name = "claude",
-                    test_file = test_content
+                    test_file = test_content,
+                    repo_path = self._repo_path
                 )
-
-                # BUG: this loop adds files sys modules and resolves them to self._repo_path
-                for module in modules.module_names:
-                    rel_mod_path = Path(*module.split("."))
-                    mod_path = root_path / (str(rel_mod_path) + EXTENSIONS[lang])
-
-                    if not mod_path.exists():
-                        # use matching filename to find the actual root pat
-                        for source_path in self._repo_path.rglob(f"**/{mod_path.name}"):
-                            root_path = Path(*[p for p in source_path.parts][:-1])
-                            mod_path = root_path / mod_path.name
-
-                            # print("New root path: ", root_path)
-                            # print("New module path: ", mod_path)
-                            if not mod_path.exists():
-                                raise Exception()
-
-                    print("> found covered src file: ", mod_path)
-
-                    src_test_mapping[str(mod_path.resolve())].append(str(f))
-                    target_files.append(mod_path)
 
                 if target_files:
                     print("Saving testfilepath: ", str(f.resolve()))

@@ -1,6 +1,7 @@
 from testbot.llm.llm import LLMModel, LMP
 from pydantic import BaseModel
-from typing import List
+from typing import Any, List
+from pathlib import Path
 
 class Modules(BaseModel):
     reasoning: str
@@ -28,3 +29,26 @@ If not, list all of the important modules under test
 Give your reasoning first before responding
 """
     response_format = Modules
+
+    def _process_result(self, res,
+                        test_file: str = "",
+                        repo_path: Path = None, ) -> List[Path]:
+        """Processes module names and attempt to resolve them to actual paths"""
+        module_paths = []
+        for module in res.module_names:
+            rel_mod_path = Path(*module.split("."))
+            mod_path = repo_path / str(rel_mod_path)
+
+            if not mod_path.exists():
+                # Use matching filename to find actual root path
+                for source_path in repo_path.rglob(f"**/{mod_path.name}"):
+                    root_path = Path(*[p for p in source_path.parts][:-1])
+                    mod_path = root_path / mod_path.name
+
+                    if not mod_path.exists():
+                        raise Exception()
+
+            print("> found covered src file: ", mod_path)
+            module_paths.append(mod_path)
+
+        return module_paths
