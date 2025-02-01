@@ -8,7 +8,7 @@ from collections import defaultdict
 from pathlib import Path
 import git
 
-from .lmp import IdentifyModules, Modules
+from .lmp import IdentifyModules
 from ..base import WorkFlow
 
 EXCLUDE_PATTERNS = [

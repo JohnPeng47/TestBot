@@ -1,7 +1,12 @@
-from typing import Dict, Callable, List
+from typing import Dict, Callable, List, Any
 from dataclasses import dataclass
-from sqlmodel import SQLModel, Field
+from sqlmodel import SQLModel, Field, JSON, Relationship
+from pydantic import BaseModel, Field as pyField
+from abc import ABC
 
+# NOTE: it would probably be simpler if we just combined Commit and PatchEvalConfig 
+# into one but separating them gives us some flexibility to select which commits
+# to commit to evaluation data
 class Commit(SQLModel, table=True):
     __table_args__ = {'extend_existing': True}  # Add this line
 
@@ -24,6 +29,19 @@ class RepoEvalConfig(SQLModel, table=True):
 
     repo_name: str
     sha: str = Field(primary_key=True)
+
+# Braintrust stuff
+class DatasetInput(BaseModel):
+    prompt_args: Dict
+    run_args: Dict = pyField(default_factory=dict)
+    
+class BraintrustDataset(BaseModel):
+    input: DatasetInput
+    expected: Dict
+
+class ToDataset(ABC):
+    def to_dataset(self) -> BraintrustDataset:
+        raise NotImplementedError
 
 @dataclass
 class EvalData:

@@ -1,16 +1,17 @@
-from src.testbot.diff import CommitDiff, DiffMode
-from src.testbot.evaluations.models import EvalData, Commit, RepoEvalConfig
+from src.testbot.diff import CommitDiff
+from src.testbot.evaluations.models import Commit
 from src.testbot.utils import GitCommitContext, is_later_commit
 from src.testbot.evaluations.utils import get_db_session_and_store
-
+from src.testbot.evaluations.models import BraintrustDataset, ToDataset, DatasetInput
+from src.testbot.workflow.init.lmp import IdentifyModules 
 from src.testbot.llm.llm import LLMModel
 from src.testbot.workflow import InitRepo
 
+from sqlmodel import Field, Relationship, SQLModel, Session, JSON, PrimaryKeyConstraint
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import List
 from sqlmodel import Session
 import click
-
 from git import Repo
 import numpy as np
 from collections import defaultdict
@@ -84,7 +85,6 @@ def bucket_commits(commit_shas: list, num_buckets: int, repo_path: str = '.') ->
         print(f"Visual distribution: {'#' * count}")
         print("-" * 50)
 
-
 def get_commits(
     repo_name: str,
     session: Session,
@@ -130,40 +130,14 @@ def eval_patch():
     """Evaluate test generation on patch diffs"""
     pass
 
-@eval_patch.command(name="create")
-@click.argument("repo_path", type=str)
-@click.argument("sha", type=str)
-@click.pass_context
-def add_repo(
-    ctx: click.Context, 
-    repo_path: str, 
-    sha: str
-):
-    """Creates a RepoConfig at a specific commit SHA"""
-    with GitCommitContext(repo_path, sha) as commit_ctx:
-        repo_path = Path(repo_path)
-        _, store = get_db_session_and_store(ctx)
-        model = LLMModel()
-        repo = store.get_repoconfig(
-            lambda x: x.source_folder == str(repo_path.resolve())
-        )
-        if repo:
-            raise Exception(f"Repository {repo.repo_name} already exists!")
-
-        workflow = InitRepo(Path(repo_path), model, store)
-        workflow.run()
-
-        print("Initialization cost: ", model.get_cost())
-
-
-@eval_patch.command(name="run")
+@eval_patch.command(name="inspect")
 @click.argument("repo_name", type=str)
 @click.option("--num-files", default=1, help="Number of files changed")
 @click.option("--num-test-files", default=1, help="Number of test files changed") 
 @click.option("--sha", help="Specific commit SHA")
 @click.option("--diff-bytes", type=int, help="Maximum diff size in bytes")
 @click.pass_context
-def run_eval(
+def inspect_commit_data(
     ctx: click.Context,
     repo_name: str,
     num_files: int = 1,
@@ -171,7 +145,7 @@ def run_eval(
     sha: str = None,
     diff_bytes: int = None
 ):
-    """Evaluates test gen on patchdiff inputs"""    
+    """Use this function to inspect commit data"""    
     session, store = get_db_session_and_store(ctx)
     commits = get_commits(repo_name, session, num_files, num_test_files, sha, diff_bytes)
     repo_config = store.get_repoconfig(lambda x: x.repo_name == repo_name)
@@ -181,32 +155,109 @@ def run_eval(
     for commit in commits:
         diff = CommitDiff(commit.diff)
         after_commit = is_later_commit(commit.sha, sha, repo_path)
-
-        new_testfunc = False
+        new_testfunc = diff.contains_newtest()
         new_file = False
-        in_store = False
-
         testfile = ""
+
         for d in diff.test_diffs():
-            for hunk in d.hunks:
-                if hunk.new_func:
-                    new_testfunc = True
-                    testfile = d.filepath
-                    if store.get_srcfile_from_testfile((repo_path / testfile).resolve()):
-                        in_store = True
-                    break
             if d.creates_new_file():
                 new_file = True
+                break
 
         # only interested in tests and existing files
-        if not new_testfunc or new_file or not after_commit or not in_store:
+        if not new_testfunc or new_file or not after_commit:
             continue
 
-        filtered_commits.append((Path(testfile).resolve(), commit))
-    
-    for f, c in filtered_commits:
-        print("testfile: ", f)
-        print(store.get_srcfile_from_testfile(f))
+        filtered_commits.append(commit)
 
-    print(len(filtered_commits))
-        
+    for i, c in enumerate(filtered_commits, start=1):
+        print(f"{i}||________________________________________________________________")
+        print("SHA: ", c.sha)
+        print(c.diff)
+
+
+class DiffTestgenDataset(SQLModel, ToDataset, table=True):
+    __table_args__ = (
+        PrimaryKeyConstraint('sha', 'dataset_name'),
+        {'extend_existing': True}  # Dictionary must be last
+    )
+
+    sha: str = Field(foreign_key="commit.sha")
+    patch: str
+    dataset_name: str
+    source_files: List[str] = Field(default={}, sa_type=JSON)
+    commit: Commit = Relationship() 
+
+    def to_dataset(self) -> BraintrustDataset:
+        return BraintrustDataset(
+            input=DatasetInput(
+                prompt_args={"patch": self.patch, "source_files": self.source_files},
+                run_args={}
+            ),
+            expected={"patch": self.patch}
+        )
+
+# TMRW:
+# - think through decision to use latest commit and go backwards with optional stopping commit,
+# instead of going forward from a starting commit; reason being that files are more likely to be missing
+# (going forward) than to be deleted/renamed (going backwards) 
+@eval_patch.command(name="create-dataset")
+@click.argument("repo_name", type=str)
+@click.option("--name", default=Path(__file__).stem + "_default", help="Name of the dataset")
+@click.option("--num-files", default=1, help="Number of files changed")
+@click.option("--num-test-files", default=1, help="Number of test files changed") 
+@click.option("--sha", help="Specific commit SHA")
+@click.option("--diff-bytes", type=int, help="Maximum diff size in bytes")
+@click.option("--commits-file", type=click.Path(exists=True), help="Path to file containing commit SHAs")
+@click.pass_context
+def construct_dataset(
+    ctx: click.Context,
+    repo_name: str,
+    num_files: int = 1,
+    num_test_files: int = 1,
+    name: str = "",
+    sha: str = None,
+    diff_bytes: int = None,
+    commits_file: str = None
+):
+    session, store = get_db_session_and_store(ctx)
+    lm = LLMModel()
+    repo_config = store.get_repoconfig(lambda x: x.repo_name == repo_name)
+    if not repo_config:
+        raise Exception(f"Repository {repo_name} not found in database")
+    
+    repo_path = Path(repo_config.source_folder)
+    if commits_file:
+        with open(commits_file) as f:
+            commit_shas = [line.strip() for line in f.readlines()]
+        commits = session.query(Commit).filter(Commit.sha.in_(commit_shas)).all()
+    else:
+        commits = get_commits(repo_name, session, num_files, num_test_files, sha, diff_bytes)
+
+    for commit in commits:
+        commit_diff = CommitDiff(commit.diff)
+        for test_fp in commit_diff.test_files:
+            print("[BUILD-DATASET] Processing test file: ", test_fp)
+            print("[PATCH]:\n", commit_diff)
+
+            test_content = open(repo_path / test_fp, "r").read()
+            target_files = IdentifyModules().invoke(
+                lm,
+                model_name = "claude",
+                test_file = test_content,
+                repo_path = repo_path
+            )
+
+            print("[TARGET-FILES]: ", target_files)
+            dataset = DiffTestgenDataset(
+                dataset_name=name,
+                sha=commit.sha,
+                patch=commit.diff,
+                source_files=[str(fp) for fp in target_files],
+                commit=commit
+            )
+            session.merge(dataset)
+            session.commit()
+
+        return
+    

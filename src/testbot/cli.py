@@ -85,7 +85,7 @@ def staged():
 def init(repo_path, language, limit):
     """Initialize a new test repository"""
     model = LLMModel()
-    store = JsonStore()
+    store = JsonStore(store_path=Path("./test_store"))
     repo_path = Path(repo_path)
     repo = store.get_repoconfig(
         lambda x: x.source_folder == str(repo_path.resolve())

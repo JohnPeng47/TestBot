@@ -1,1 +1,1 @@
-from .eval_patch import eval_patch, add_repo
+from .diff_testgen.eval_patch import eval_patch
