@@ -1,1 +1,1 @@
-from .diff_testgen.eval_patch import eval_patch
+from .diff_testgen.eval_patch import eval_patch, DiffTestgenDataset

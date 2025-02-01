@@ -1,13 +1,11 @@
 from src.testbot.diff import CommitDiff
 from src.testbot.evaluations.models import Commit
-from src.testbot.utils import GitCommitContext, is_later_commit
+from src.testbot.utils import is_later_commit
 from src.testbot.evaluations.utils import get_db_session_and_store
 from src.testbot.evaluations.models import BraintrustDataset, ToDataset, DatasetInput
 from src.testbot.workflow.init.lmp import IdentifyModules 
-from src.testbot.llm.llm import LLMModel
-from src.testbot.workflow import InitRepo
+from src.testbot.llm.llm import LLMModel, num_tokens_from_string
 
-from sqlmodel import Field, Relationship, SQLModel, Session, JSON, PrimaryKeyConstraint
 from pathlib import Path
 from typing import List
 from sqlmodel import Session
@@ -15,8 +13,125 @@ import click
 from git import Repo
 import numpy as np
 from collections import defaultdict
+from sqlmodel import Field, Relationship, SQLModel, Session, JSON, PrimaryKeyConstraint
 
-def bucket_commits(commit_shas: list, num_buckets: int, repo_path: str = '.') -> dict:
+def get_commits(
+    repo_name: str,
+    session: Session,
+    num_files: int = 1,
+    num_test_files: int = 1,
+    sha: str = None,
+    diff_bytes: int = None
+) -> List[Commit]:
+    """List commits matching the given filters"""
+
+    filters = {}
+    if repo_name:
+        filters["repo"] = repo_name
+    if num_files is not None:
+        filters["num_files"] = num_files 
+    if num_test_files is not None:
+        filters["num_test_files"] = num_test_files
+    if sha:
+        filters["sha"] = sha
+    if diff_bytes is not None:
+        filters["diff_bytes"] = diff_bytes
+
+    query = session.query(Commit)
+    valid_attrs = ["sha", "diff", "repo", "diff_bytes", "num_files", "num_test_files"]
+    for attr, value in filters.items():
+        if attr in valid_attrs:
+            if attr == "diff_bytes":
+                query = query.filter(getattr(Commit, attr) <= value)
+            else:
+                query = query.filter(getattr(Commit, attr) == value)
+        else:
+            raise ValueError(f"Invalid filter attribute: {attr}")
+    
+    commits = query.all()
+    if not commits:
+        print("No commits found matching filters")
+        return
+
+    return commits
+
+@click.group()
+def eval_patch():
+    """Evaluate test generation on patch diffs"""
+    pass
+
+@eval_patch.command(name="build-commits")
+@click.argument("repo_path", type=str)
+@click.pass_context
+def build_commits(ctx: click.Context, repo_path: str):
+    """Download commits for a repository"""
+    session, store = get_db_session_and_store(ctx)
+    repo_path = Path(repo_path)
+    repo = Repo(repo_path)
+    commits = list(repo.iter_commits())
+
+    print(f"Downloading {len(commits)} commits")
+
+    for i, commit in enumerate(commits):
+        try:
+            print(f"{i}/{len(commits)}")
+            
+            num_files = 0
+            num_test_files = 0
+            diff_bytes = 0
+            
+            if not commit.parents:
+                print("Skipping commit without parents")
+                continue
+
+            git_diff = repo.git.diff(commit.parents[0], commit, unified=3)
+            diff = CommitDiff(git_diff)
+
+            is_test_modification = False
+            num_files += len(diff.code_files)
+            num_test_files += len(diff.test_files)
+            code_diff_text = "".join(str(d) for d in diff.code_diffs())
+            test_diff_text = "".join(str(d) for d in diff.test_diffs())
+            
+            combined_diff_text = code_diff_text + test_diff_text
+            diff_bytes += num_tokens_from_string(combined_diff_text)
+
+            if num_files > 0 and num_test_files > 0:
+                print(f"Commit {commit} has {num_files} files and {num_test_files} test files")
+                if num_files == 1 and num_test_files == 1:
+                    print(diff)
+
+                commit_obj = Commit(
+                    sha=commit.hexsha,
+                    diff=git_diff,
+                    repo=repo_path.name,
+                    num_files=num_files,
+                    num_test_files=num_test_files,
+                    diff_bytes=diff_bytes,
+                    timestamp=diff.timestamp,
+                    merge_commit=False,
+                    merge_parent=None,
+                    is_test_modification=is_test_modification
+                )
+                
+                existing = session.get(Commit, commit.hexsha)
+                if existing:
+                    for key, value in commit_obj.dict().items():
+                        setattr(existing, key, value)
+                else:
+                    session.add(commit_obj)
+                session.commit()
+
+        except Exception as e:
+            # print(traceback.format_exc())
+            print(f"Downloading {commit} failed")
+            continue
+
+@eval_patch.command(name="bucket")
+@click.argument("commit_shas", nargs=-1)
+@click.option("--num-buckets", default=5, help="Number of buckets to segment commits into")
+@click.option("--repo-path", default=".", help="Path to git repository")
+def bucket_commits(commit_shas: list, num_buckets: int, repo_path: str = ".") -> dict:
     """
     Bucket commits based on their dates into specified number of buckets.
     
@@ -85,51 +200,6 @@ def bucket_commits(commit_shas: list, num_buckets: int, repo_path: str = '.') ->
         print(f"Visual distribution: {'#' * count}")
         print("-" * 50)
 
-def get_commits(
-    repo_name: str,
-    session: Session,
-    num_files: int = 1,
-    num_test_files: int = 1,
-    sha: str = None,
-    diff_bytes: int = None
-) -> List[Commit]:
-    """List commits matching the given filters"""
-
-    filters = {}
-    if repo_name:
-        filters["repo"] = repo_name
-    if num_files is not None:
-        filters["num_files"] = num_files 
-    if num_test_files is not None:
-        filters["num_test_files"] = num_test_files
-    if sha:
-        filters["sha"] = sha
-    if diff_bytes is not None:
-        filters["diff_bytes"] = diff_bytes
-
-    query = session.query(Commit)
-    valid_attrs = ["sha", "diff", "repo", "diff_bytes", "num_files", "num_test_files"]
-    for attr, value in filters.items():
-        if attr in valid_attrs:
-            if attr == "diff_bytes":
-                query = query.filter(getattr(Commit, attr) <= value)
-            else:
-                query = query.filter(getattr(Commit, attr) == value)
-        else:
-            raise ValueError(f"Invalid filter attribute: {attr}")
-    
-    commits = query.all()
-    if not commits:
-        print("No commits found matching filters")
-        return
-
-    return commits
-
-@click.group()
-def eval_patch():
-    """Evaluate test generation on patch diffs"""
-    pass
-
 @eval_patch.command(name="inspect")
 @click.argument("repo_name", type=str)
 @click.option("--num-files", default=1, help="Number of files changed")
@@ -148,13 +218,14 @@ def inspect_commit_data(
     """Use this function to inspect commit data"""    
     session, store = get_db_session_and_store(ctx)
     commits = get_commits(repo_name, session, num_files, num_test_files, sha, diff_bytes)
+    
     repo_config = store.get_repoconfig(lambda x: x.repo_name == repo_name)
     repo_path = Path(repo_config.source_folder)
     filtered_commits = []
     
     for commit in commits:
         diff = CommitDiff(commit.diff)
-        after_commit = is_later_commit(commit.sha, sha, repo_path)
+        after_commit = is_later_commit(commit.sha, sha, repo_path) if sha else True
         new_testfunc = diff.contains_newtest()
         new_file = False
         testfile = ""
@@ -184,7 +255,7 @@ class DiffTestgenDataset(SQLModel, ToDataset, table=True):
 
     sha: str = Field(foreign_key="commit.sha")
     patch: str
-    dataset_name: str
+    dataset_name: str = Field(default="", nullable=False)
     source_files: List[str] = Field(default={}, sa_type=JSON)
     commit: Commit = Relationship() 
 
@@ -257,7 +328,4 @@ def construct_dataset(
                 commit=commit
             )
             session.merge(dataset)
-            session.commit()
-
-        return
-    
+            session.commit()    

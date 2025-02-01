@@ -27,6 +27,7 @@ instructor = {git = "https://github.com/JohnPeng47/instructor.git"}
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.4"
+alembic = "^1.14.1"
 
 [build-system]
 requires = ["poetry-core"]

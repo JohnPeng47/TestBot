@@ -15,7 +15,8 @@ from testbot.utils import load_env
 
 from .models import Commit
 from .utils import get_db_session_and_store
-from .evals import eval_patch
+from .evals import eval_patch, DiffTestgenDataset
+
 
 ## import evals
 from testbot.workflow.test_diff.evals import FILTER_SRC_FILES_CONSISTENCY
@@ -42,7 +43,7 @@ def eval_cli(ctx: click.Context, db_path: str):
     engine = create_engine(sqlite_url, echo=False)
     
     # Create tables only once at startup
-    SQLModel.metadata.create_all(engine)
+    SQLModel.metadata.create_all(engine, checkfirst=True)
 
     store = JsonStore()
     
@@ -51,73 +52,6 @@ def eval_cli(ctx: click.Context, db_path: str):
 
 # add evaluations as subcommands    
 eval_cli.add_command(eval_patch)
-
-@eval_cli.command()
-@click.argument("repo_path", type=str)
-@click.pass_context
-def build_commits(ctx: click.Context, repo_path: str):
-    """Download commits for a repository"""
-    with get_db_session_and_store(ctx) as (session, _):
-        repo_path = Path(repo_path)
-        repo = git.Repo(repo_path)
-        commits = list(repo.iter_commits())
-
-        print(f"Downloading {len(commits)} commits")
-
-        for i, commit in enumerate(commits):
-            try:
-                print(f"{i}/{len(commits)}")
-                
-                num_files = 0
-                num_test_files = 0
-                diff_bytes = 0
-                
-                if not commit.parents:
-                    print("Skipping commit without parents")
-                    continue
-
-                git_diff = repo.git.diff(commit.parents[0], commit, unified=3)
-                diff = CommitDiff(git_diff)
-
-                is_test_modification = False
-                num_files += len(diff.code_files)
-                num_test_files += len(diff.test_files)
-                code_diff_text = "".join(str(d) for d in diff.code_diffs())
-                test_diff_text = "".join(str(d) for d in diff.test_diffs())
-                
-                combined_diff_text = code_diff_text + test_diff_text
-                diff_bytes += num_tokens_from_string(combined_diff_text)
-
-                if num_files > 0 and num_test_files > 0:
-                    print(f"Commit {commit} has {num_files} files and {num_test_files} test files")
-                    if num_files == 1 and num_test_files == 1:
-                        print(diff)
-
-                    commit_obj = Commit(
-                        sha=commit.hexsha,
-                        diff=git_diff,
-                        repo=repo_path.name,
-                        num_files=num_files,
-                        num_test_files=num_test_files,
-                        diff_bytes=diff_bytes,
-                        timestamp=diff.timestamp,
-                        merge_commit=False,
-                        merge_parent=None,
-                        is_test_modification=is_test_modification
-                    )
-                    
-                    existing = session.get(Commit, commit.hexsha)
-                    if existing:
-                        for key, value in commit_obj.dict().items():
-                            setattr(existing, key, value)
-                    else:
-                        session.add(commit_obj)
-                    session.commit()
-
-            except Exception as e:
-                print(traceback.format_exc())
-                print(f"Downloading {commit} failed")
-                continue
 
 @eval_cli.command()
 @click.option("--repo", help="Filter by repository name")
@@ -232,6 +166,5 @@ def run(eval_name: str,
             )
 
 
-if __name__ == "__main__":
-    
+if __name__ == "__main__":    
     eval_cli()
