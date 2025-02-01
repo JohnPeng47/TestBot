@@ -27,3 +27,7 @@ class TestBotStore(ABC):
     @abstractmethod
     def get_testfiles_from_srcfile(self, source_file: Path) -> TestFileData | None:
         pass
+
+    @abstractmethod
+    def get_srcfile_from_testfile(self, test_file: Path) -> Path | None:
+        pass

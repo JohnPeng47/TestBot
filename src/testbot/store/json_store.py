@@ -70,6 +70,16 @@ class JsonStore(TestBotStore):
                 
         return matching_tests
     
+    def get_srcfile_from_testfile(self, test_file: Path) -> Optional[TestFileData]:
+        tests = self._read_json(self.tests_file)
+        test_file_str = str(test_file)
+        
+        for _, test_data in tests.items():
+            if test_file_str == test_data.filepath:
+                return test_data
+
+        return None
+    
     def _read_json(self, file_path: Path) -> dict[str, RepoConfig] | dict[str, TestFileData]:
         with open(file_path, "r") as f:
             data = json.load(f)

@@ -128,7 +128,7 @@ class GitCommitContext:
     def __enter__(self):
         try:
             print(green_text(f"Resetting to commit {self.target_commit}"))
-            
+
             self.repo.commit(self.target_commit)
             self.repo.git.reset("--hard", self.target_commit)
             return self.repo
@@ -206,3 +206,11 @@ def get_staged_files(repo_path = "."):
     """Get the list of staged files in the current git repo."""
     repo = git.Repo(repo_path)
     return repo.git.diff("--cached", "--name-only").splitlines()
+
+def is_later_commit(commit: str, target_commit: str, repo_path: str) -> bool:
+    """Check if the given commit is later than the target commit."""
+    repo = git.Repo(repo_path)
+    commit_obj = repo.commit(commit)
+    target_obj = repo.commit(target_commit)
+    
+    return commit_obj.committed_date > target_obj.committed_date

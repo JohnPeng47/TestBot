@@ -1,7 +1,6 @@
-from src.testbot.store import TestBotStore, JsonStore
 from src.testbot.diff import CommitDiff, DiffMode
 from src.testbot.evaluations.models import EvalData, Commit, RepoEvalConfig
-from src.testbot.utils import GitCommitContext
+from src.testbot.utils import GitCommitContext, is_later_commit
 from src.testbot.evaluations.utils import get_db_session_and_store
 
 from src.testbot.llm.llm import LLMModel
@@ -153,13 +152,12 @@ def add_repo(
 
         workflow = InitRepo(Path(repo_path), model, store)
         workflow.run()
-        
+
         print("Initialization cost: ", model.get_cost())
 
 
 @eval_patch.command(name="run")
 @click.argument("repo_name", type=str)
-@click.argument("repo_path", type=str)
 @click.option("--num-files", default=1, help="Number of files changed")
 @click.option("--num-test-files", default=1, help="Number of test files changed") 
 @click.option("--sha", help="Specific commit SHA")
@@ -168,33 +166,47 @@ def add_repo(
 def run_eval(
     ctx: click.Context,
     repo_name: str,
-    repo_path: str,
     num_files: int = 1,
     num_test_files: int = 1,
     sha: str = None,
     diff_bytes: int = None
 ):
-    """Evaluates test gen on patchdiff inputs"""
-    store = JsonStore()
+    """Evaluates test gen on patchdiff inputs"""    
+    session, store = get_db_session_and_store(ctx)
+    commits = get_commits(repo_name, session, num_files, num_test_files, sha, diff_bytes)
+    repo_config = store.get_repoconfig(lambda x: x.repo_name == repo_name)
+    repo_path = Path(repo_config.source_folder)
+    filtered_commits = []
     
-    with get_db_session_and_store(ctx) as (session, store):
-        commits = get_commits(repo_name, session, num_files, num_test_files, sha, diff_bytes)
+    for commit in commits:
+        diff = CommitDiff(commit.diff)
+        after_commit = is_later_commit(commit.sha, sha, repo_path)
 
-        # bucket_commits([c.sha for c in commits], 5, repo_path=repo_path)
-        filtered_commits = []
+        new_testfunc = False
+        new_file = False
+        in_store = False
+
+        testfile = ""
+        for d in diff.test_diffs():
+            for hunk in d.hunks:
+                if hunk.new_func:
+                    new_testfunc = True
+                    testfile = d.filepath
+                    if store.get_srcfile_from_testfile((repo_path / testfile).resolve()):
+                        in_store = True
+                    break
+            if d.creates_new_file():
+                new_file = True
+
+        # only interested in tests and existing files
+        if not new_testfunc or new_file or not after_commit or not in_store:
+            continue
+
+        filtered_commits.append((Path(testfile).resolve(), commit))
+    
+    for f, c in filtered_commits:
+        print("testfile: ", f)
+        print(store.get_srcfile_from_testfile(f))
+
+    print(len(filtered_commits))
         
-        for commit in commits:
-            diff = CommitDiff(commit.di)
-            new_testfunc = False
-            new_file = False
-            for d in diff.test_diffs():
-                for hunk in d.hunks:
-                    if hunk.new_func:
-                        new_testfunc = True
-                        break
-                if diff.creates_new_file():
-                    new_file = True
-                            
-            # only interested in tests and existing files
-            if not new_testfunc or new_file:
-                continue
