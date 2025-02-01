@@ -70,21 +70,18 @@ class HunkChunk:
         return None, None, None, None
 
     # TODO: need to replace this with language specific
-    def _new_func_decl(self) -> str:
+    def _new_func_decl(self, search_plus = True) -> str:
         """
         If the hunk declares a new test function, return it
         """
-        # Hunk can be empty since we are only currently looking at + lines
-        # if len(self.lines) == 0:
-        #     return ""
+        search_body = self.plus_blob if search_plus else self.minus_blob
 
         PYTHON_FUN_DEF = r"\+?\s*(?:async\s+)?def\s+([a-zA-Z_][a-zA-Z_0-9]*)\s*\("
-        match = re.search(PYTHON_FUN_DEF, self.body)
+        match = re.search(PYTHON_FUN_DEF, search_body)
         if match:
             return match.group(1)
         else:
             return ""
-
 
 class DiffMode(Enum):
     MODIFIED = "modified"
@@ -282,6 +279,16 @@ class CommitDiff:
             if Path(diff.filepath) == Path(filename):
                 return diff
         return None
+
+    def contains_newtest(self) -> bool:
+        """
+        Returns True if the patch contains a new test function
+        """
+        for diff in self.test_diffs():
+            for hunk in diff.hunks:
+                if hunk.new_func:
+                    return True
+        return False
 
     # @property
     # def code_diff(self) -> str:
