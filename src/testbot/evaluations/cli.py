@@ -1,21 +1,17 @@
 import click
 from braintrust import Eval
 from typing import NewType
-import git
-from pathlib import Path
-import traceback
 from sqlmodel import Session, create_engine, SQLModel
 from functools import wraps
 
 from testbot.store import JsonStore
-from testbot.diff import CommitDiff
 from testbot.llm.llm import LLMModel, num_tokens_from_string
 from testbot.config import BRAINTRUST_PROJ_NAME
 from testbot.utils import load_env
 
 from .models import Commit
 from .utils import get_db_session_and_store
-from .evals import eval_patch, DiffTestgenDataset
+from .evals import eval_patch
 
 
 ## import evals
@@ -129,7 +125,9 @@ def list_commits(ctx, repo, num_files, num_test_files, sha, diff_bytes):
 @click.option("--iters", default=15, help="Number of iterations to run", type=int)
 @click.option("--experiment-suffix", "-s", help="Suffix for experiment name")
 @click.option("--comments", "-m", help="Comments for the evaluation")
-def run(eval_name: str,
+@click.pass_context
+def run(ctx: click.Context,
+        eval_name: str,
         model_name: str,
         iters: int,
         experiment_suffix: str,
@@ -137,6 +135,7 @@ def run(eval_name: str,
     """Run a specific evaluation"""
     load_env()
     model = LLMModel()
+    session, store = get_db_session_and_store(ctx)
 
     for eval_data in ALL_EVALS:
         if eval_data.name == eval_name:

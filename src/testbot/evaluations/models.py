@@ -46,6 +46,6 @@ class ToDataset(ABC):
 @dataclass
 class EvalData:
     name: str
-    dataset: Dict
+    dataset: Callable
     eval_fn: Callable
     score_fns: List[Callable]

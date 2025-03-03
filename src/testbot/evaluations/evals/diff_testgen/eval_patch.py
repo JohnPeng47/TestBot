@@ -308,9 +308,6 @@ def construct_dataset(
     for commit in commits:
         commit_diff = CommitDiff(commit.diff)
         for test_fp in commit_diff.test_files:
-            print("[BUILD-DATASET] Processing test file: ", test_fp)
-            print("[PATCH]:\n", commit_diff)
-
             test_content = open(repo_path / test_fp, "r").read()
             target_files = IdentifyModules().invoke(
                 lm,
@@ -318,8 +315,6 @@ def construct_dataset(
                 test_file = test_content,
                 repo_path = repo_path
             )
-
-            print("[TARGET-FILES]: ", target_files)
             dataset = DiffTestgenDataset(
                 dataset_name=name,
                 sha=commit.sha,
